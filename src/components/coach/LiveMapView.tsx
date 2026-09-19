@@ -3,12 +3,11 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import L from 'leaflet';
 import { Athlete } from '../../types';
 import { formatPace, formatDistance, getStatusDetails, getZoneDetails, calculateHeartRateZone } from '../../lib/calculations';
-import { Heart, Gauge, MapPin, Radio, Compass, Flag, Navigation } from 'lucide-react';
+import { Heart, Gauge, MapPin, Radio } from 'lucide-react';
 
 interface LiveMapViewProps {
   athletes: Athlete[];
   onSelectAthlete: (athleteId: string) => void;
-  enableTrackbackToggle?: boolean;
 }
 
 // Generador de Iconos SVG personalizados para Leaflet según estado
@@ -68,39 +67,9 @@ function createStatusMarkerIcon(status: Athlete['currentStatus'], initials: stri
   });
 }
 
-// Icono del Punto de Salida para volver sobre sus pasos
-function createStartPointMarkerIcon() {
-  const svgHtml = `
-    <div style="
-      background: #10B981;
-      color: black;
-      font-weight: 900;
-      font-size: 10px;
-      padding: 3px 7px;
-      border-radius: 8px;
-      border: 2px solid white;
-      box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      white-space: nowrap;
-      font-family: sans-serif;
-    ">
-      🏁 SALIDA
-    </div>
-  `;
-  return L.divIcon({
-    html: svgHtml,
-    className: 'start-point-pin',
-    iconSize: [64, 24],
-    iconAnchor: [32, 12],
-  });
-}
-
-export const LiveMapView: React.FC<LiveMapViewProps> = ({ athletes, onSelectAthlete, enableTrackbackToggle = true }) => {
+export const LiveMapView: React.FC<LiveMapViewProps> = ({ athletes, onSelectAthlete }) => {
   // Centro por defecto: Palermo / Circuito Running (-34.5711, -58.4173)
   const defaultCenter: [number, number] = [-34.5711, -58.4173];
-  const [trackbackActive, setTrackbackActive] = useState(false);
 
   const activeAthletesWithCoords = useMemo(() => {
     return athletes.filter(a => a.lastSample?.latitude && a.lastSample?.longitude);
@@ -118,32 +87,6 @@ export const LiveMapView: React.FC<LiveMapViewProps> = ({ athletes, onSelectAthl
         <span className="text-slate-500">•</span>
         <span className="text-slate-300 font-medium">{activeAthletesWithCoords.length} corredores en mapa</span>
       </div>
-
-      {/* Botón Overlay Derecho: Volver sobre sus pasos (Trackback) */}
-      {enableTrackbackToggle && (
-        <div className="absolute top-4 right-4 z-[1000]">
-          <button
-            onClick={() => setTrackbackActive(!trackbackActive)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition shadow-xl backdrop-blur border ${
-              trackbackActive 
-                ? 'bg-amber-400 text-black border-amber-300 shadow-amber-400/25 ring-2 ring-amber-400/50' 
-                : 'bg-[#0B0F19]/90 text-slate-300 border-radar-border hover:text-white hover:border-slate-600'
-            }`}
-            title="Mostrar rastro GPS completo y camino de regreso a la salida"
-          >
-            <Compass className={`w-4 h-4 ${trackbackActive ? 'animate-spin' : ''}`} />
-            <span>{trackbackActive ? '🧭 Ruta de Retorno (Trackback): ACTIVA' : '🧭 Volver sobre mis pasos'}</span>
-          </button>
-        </div>
-      )}
-
-      {/* Banner flotante de Trackback activo */}
-      {trackbackActive && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] bg-amber-950/90 border border-amber-500/50 text-amber-200 px-4 py-2 rounded-xl text-xs font-semibold backdrop-blur shadow-2xl flex items-center gap-2">
-          <Navigation className="w-4 h-4 text-amber-400 animate-bounce" />
-          <span>Rastro GPS iluminado: sigue la línea continua para regresar al punto 🏁 SALIDA.</span>
-        </div>
-      )}
 
       <MapContainer
         center={defaultCenter}
@@ -170,38 +113,21 @@ export const LiveMapView: React.FC<LiveMapViewProps> = ({ athletes, onSelectAthl
 
           return (
             <React.Fragment key={athlete.id}>
-              {/* Trail reciente o Ruta Trackback para volver sobre sus pasos */}
+              {/* Trail reciente */}
               {athlete.trail && athlete.trail.length > 1 && (
                 <Polyline
                   positions={athlete.trail}
                   color={
-                    trackbackActive
-                      ? '#F59E0B'
-                      : athlete.currentStatus === 'alert'
+                    athlete.currentStatus === 'alert'
                       ? '#EF4444'
                       : athlete.currentStatus === 'attention'
                       ? '#F59E0B'
                       : '#00F0FF'
                   }
-                  weight={trackbackActive ? 5 : 3}
-                  opacity={trackbackActive ? 0.95 : 0.6}
-                  dashArray={trackbackActive ? undefined : "4, 4"}
+                  weight={3}
+                  opacity={0.6}
+                  dashArray="4, 4"
                 />
-              )}
-
-              {/* Pin de Salida si Trackback está activo */}
-              {trackbackActive && athlete.trail && athlete.trail.length > 0 && (
-                <Marker
-                  position={athlete.trail[0]}
-                  icon={createStartPointMarkerIcon()}
-                >
-                  <Popup>
-                    <div className="p-1 text-xs">
-                      <strong className="text-emerald-400 block mb-0.5">🏁 Punto de Partida</strong>
-                      <span className="text-slate-200">Ruta de inicio de {athlete.name}. Sigue la línea para volver.</span>
-                    </div>
-                  </Popup>
-                </Marker>
               )}
 
               {/* Pin del Atleta */}
