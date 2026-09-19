@@ -10,6 +10,7 @@ import {
   SimulatorConfig,
   AthletePermissions
 } from '../types';
+import { supabaseService, isSupabaseConfigured } from '../lib/supabaseClient';
 
 interface RadarContextType {
   coach: Coach | null;
@@ -204,6 +205,34 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       s.disconnect();
     };
   }, []);
+
+  // Suscribirse a Supabase Realtime si está configurado en la nube
+  useEffect(() => {
+    if (!isSupabaseConfigured || !selectedGroupId) return;
+
+    const channel = supabaseService.subscribeToGroupTelemetry(selectedGroupId, (sample) => {
+      setAthletes((prevAthletes) => {
+        return prevAthletes.map((ath) => {
+          if (ath.id !== sample.athleteId) return ath;
+          const updatedTrail = ath.trail ? [...ath.trail] : [];
+          if (sample.latitude && sample.longitude) {
+            updatedTrail.push([sample.latitude, sample.longitude]);
+            if (updatedTrail.length > 50) updatedTrail.shift();
+          }
+          return {
+            ...ath,
+            lastSample: sample,
+            lastSeen: Date.now(),
+            trail: updatedTrail,
+          };
+        });
+      });
+    });
+
+    return () => {
+      if (channel) channel.unsubscribe();
+    };
+  }, [selectedGroupId]);
 
   const currentRunner = athletes.find(a => a.id === currentRunnerId) || athletes[0] || null;
 
