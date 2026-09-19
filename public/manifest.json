@@ -1,0 +1,18 @@
+{
+  "name": "RunRadar (RR) — Central de Running",
+  "short_name": "RunRadar",
+  "description": "Central de telemetría y monitoreo de running en tiempo real para entrenadores y corredores.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0F19",
+  "theme_color": "#0B0F19",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

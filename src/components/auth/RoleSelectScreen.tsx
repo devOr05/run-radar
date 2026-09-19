@@ -1,0 +1,314 @@
+import React, { useState, useEffect } from 'react';
+import { useRadar } from '../../context/RadarContext';
+import { 
+  Radio, 
+  Users, 
+  Heart, 
+  ArrowRight, 
+  ShieldCheck, 
+  Activity, 
+  Zap, 
+  ChevronRight, 
+  Sparkles, 
+  Check,
+  Download,
+  Smartphone,
+  X,
+  Share,
+  PlusSquare,
+  HelpCircle
+} from 'lucide-react';
+
+export const RoleSelectScreen: React.FC = () => {
+  const { setUserRole, athletes, groups, setCurrentRunnerId, isConnected } = useRadar();
+  const [selectedAthleteOption, setSelectedAthleteOption] = useState<string>(athletes[0]?.id || 'athlete-1');
+  const [runnerCode, setRunnerCode] = useState('RUN-4821');
+
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+
+  useEffect(() => {
+    // Detectar si ya corre instalada como app
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
+      setIsStandalone(true);
+    }
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsStandalone(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choiceResult = await deferredPrompt.userChoice;
+      if (choiceResult.outcome === 'accepted') {
+        setIsStandalone(true);
+      }
+      setDeferredPrompt(null);
+    } else {
+      setShowInstallModal(true);
+    }
+  };
+
+  const handleCoachLogin = () => {
+    setUserRole('coach');
+  };
+
+  const handleRunnerLogin = () => {
+    setCurrentRunnerId(selectedAthleteOption);
+    setUserRole('runner');
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden font-['Inter',sans-serif]">
+      {/* Background glow effects */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Main Header */}
+      <div className="relative z-10 text-center max-w-2xl mx-auto mb-8">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-xl shadow-cyan-500/20 mb-4 border border-cyan-400/30">
+          <Radio className="w-9 h-9 text-black animate-pulse" />
+        </div>
+        
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white font-['JetBrains_Mono',monospace]">
+            RUN<span className="text-cyan-400">RADAR</span>
+          </h1>
+          <span className="text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/60">
+            PRO
+          </span>
+        </div>
+        
+        <p className="text-slate-400 text-sm sm:text-base font-normal mb-3">
+          Central de telemetría de running en tiempo real. Selecciona tu perfil para comenzar.
+        </p>
+
+        {/* Status pill & PWA Install Button */}
+        <div className="flex flex-wrap items-center justify-center gap-2.5">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 text-xs text-slate-400">
+            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span>{isConnected ? 'Servidor de Telemetría Activo' : 'Conectando al servidor...'}</span>
+          </div>
+
+          <button
+            onClick={handleInstallClick}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 hover:bg-cyan-500 hover:text-black border border-cyan-500/30 text-cyan-400 text-xs font-bold transition shadow-sm hover:shadow-cyan-500/20 group"
+            title="Instalar RunRadar como aplicación PWA"
+          >
+            <Download className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+            <span>{isStandalone ? '✓ App Instalada' : '📲 Instalar App (PWA)'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Cards Grid */}
+      <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full">
+        
+        {/* Card: ENTRENADOR */}
+        <div className="bg-slate-900/90 border border-slate-800 hover:border-cyan-500/60 rounded-2xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-500/10 group">
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 group-hover:bg-cyan-500 group-hover:text-black transition-all">
+                <Users className="w-6 h-6" />
+              </div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-400 bg-cyan-950/60 border border-cyan-800/40 px-2.5 py-1 rounded-full">
+                Vista Técnica
+              </span>
+            </div>
+
+            <h2 className="text-xl font-bold text-white mb-2 group-hover:text-cyan-300 transition">
+              Soy Entrenador
+            </h2>
+            <p className="text-slate-400 text-sm leading-relaxed mb-6">
+              Gestiona todos tus grupos de entrenamiento. Monitorea a todo el pelotón en el mapa GPS, controla semáforos de esfuerzo y atiende alertas críticas al instante.
+            </p>
+
+            <ul className="space-y-2.5 mb-8 text-xs text-slate-300">
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span><strong>Hub de Grupos:</strong> Ver todos los grupos y entrar a monitorear</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span><strong>Radar en Vivo:</strong> Grilla de atletas + Mapa GPS interactivo</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span><strong>Ficha Individual:</strong> Telemetría detallada por corredor</span>
+              </li>
+            </ul>
+          </div>
+
+          <button
+            onClick={handleCoachLogin}
+            className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25 transition group-hover:gap-3"
+          >
+            <span>Ingresar como Entrenador</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Card: CORREDOR */}
+        <div className="bg-slate-900/90 border border-slate-800 hover:border-emerald-500/60 rounded-2xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 hover:shadow-2xl hover:shadow-emerald-500/10 group">
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 group-hover:bg-emerald-500 group-hover:text-black transition-all">
+                <Heart className="w-6 h-6" />
+              </div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2.5 py-1 rounded-full">
+                Vista Atleta
+              </span>
+            </div>
+
+            <h2 className="text-xl font-bold text-white mb-2 group-hover:text-emerald-300 transition">
+              Soy Corredor
+            </h2>
+            <p className="text-slate-400 text-sm leading-relaxed mb-4">
+              Sigue tu propio rendimiento biométrico en tiempo real y compáralo con el estado colectivo del pelotón.
+            </p>
+
+            {/* Quick Profile / Code Selector */}
+            <div className="bg-slate-950/80 rounded-xl p-3.5 border border-slate-800 mb-6 space-y-3">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                  Atleta demo para probar:
+                </label>
+                <select
+                  value={selectedAthleteOption}
+                  onChange={(e) => setSelectedAthleteOption(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                >
+                  {athletes.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} {a.lastName} ({a.devices[0]?.name || 'Sensor'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                  Código de Grupo:
+                </label>
+                <input
+                  type="text"
+                  value={runnerCode}
+                  onChange={(e) => setRunnerCode(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 font-mono"
+                  placeholder="Ej: RUN-4821"
+                />
+              </div>
+            </div>
+
+            <ul className="space-y-2 mb-6 text-xs text-slate-300">
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span><strong>Mi Estado Individual:</strong> FC en vivo, Zonas Z1-Z5 y ritmo</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span><strong>Estado Colectivo:</strong> Ritmo del pelotón y posición del grupo</span>
+              </li>
+            </ul>
+          </div>
+
+          <button
+            onClick={handleRunnerLogin}
+            className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition group-hover:gap-3"
+          >
+            <span>Ingresar como Corredor</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+      </div>
+
+      {/* Footer info */}
+      <div className="relative z-10 mt-12 text-center text-xs text-slate-500">
+        RunRadar &copy; 2026 — Plataforma de Telemetría para Entrenadores y Grupos de Running
+      </div>
+
+      {/* PWA Install Instructions Modal */}
+      {showInstallModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowInstallModal(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <Download className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Instalar RunRadar PWA</h3>
+                  <p className="text-xs text-slate-400">Funciona como app nativa en tu dispositivo</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowInstallModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs text-slate-300 mb-6">
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <span className="font-bold text-cyan-400 block mb-1">📱 En iPhone / iPad (Safari):</span>
+                <ol className="list-decimal list-inside space-y-1 text-slate-400">
+                  <li>Toca el botón <strong>Compartir</strong> (ícono con flecha hacia arriba).</li>
+                  <li>Desplázate hacia abajo y selecciona <strong>"Agregar a pantalla de inicio"</strong>.</li>
+                  <li>Toca <strong>"Agregar"</strong> arriba a la derecha.</li>
+                </ol>
+              </div>
+
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <span className="font-bold text-emerald-400 block mb-1">🤖 En Android (Chrome / Brave / Edge):</span>
+                <ol className="list-decimal list-inside space-y-1 text-slate-400">
+                  <li>Toca el menú de los <strong>3 puntos</strong> en la esquina superior.</li>
+                  <li>Selecciona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a la pantalla principal"</strong>.</li>
+                </ol>
+              </div>
+
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <span className="font-bold text-blue-400 block mb-1">💻 En PC o Mac (Chrome / Edge):</span>
+                <p className="text-slate-400">
+                  Haz clic en el ícono de <strong>Instalar</strong> que aparece al final de la barra de direcciones del navegador.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowInstallModal(false)}
+              className="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs transition"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
