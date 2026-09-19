@@ -4,6 +4,7 @@ import { AthleteCard } from './AthleteCard';
 import { LiveMapView } from './LiveMapView';
 import { AthleteDetailModal } from './AthleteDetailModal';
 import { NewSessionModal } from './NewSessionModal';
+import { GroupShareModal } from './GroupShareModal';
 import { 
   Users, 
   Play, 
@@ -404,39 +405,12 @@ export const CoachDashboard: React.FC = () => {
         />
       )}
 
-      {/* Modal de Invitación / QR */}
-      {isInviteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="relative w-full max-w-sm bg-radar-card border border-radar-border rounded-2xl p-6 shadow-2xl text-center">
-            <h3 className="text-lg font-bold text-white mb-1">Invitar Corredores a {currentGroup?.name}</h3>
-            <p className="text-xs text-slate-400 mb-5">El corredor solo debe escanear el QR o ingresar el código.</p>
-
-            {/* QR Mockup con SVG estilizado */}
-            <div className="bg-white p-4 rounded-2xl inline-block mb-4 shadow-inner">
-              <svg viewBox="0 0 100 100" className="w-40 h-40">
-                <rect width="100" height="100" fill="white" />
-                <path d="M10 10h30v30h-30zM50 10h10v10h-10zM70 10h20v20h-20zM10 50h10v10h-10zM30 50h30v10h-30zM80 40h10v20h-10zM10 70h20v20h-20zM40 70h10v20h-10zM60 70h30v20h-30z" fill="black" />
-                <rect x="18" y="18" width="14" height="14" fill="white" />
-                <rect x="22" y="22" width="6" height="6" fill="black" />
-                <rect x="68" y="78" width="14" height="6" fill="white" />
-              </svg>
-            </div>
-
-            <div className="bg-[#0B0F19] p-3 rounded-xl border border-radar-border mb-5">
-              <span className="text-[10px] text-slate-400 uppercase tracking-widest block mb-1">Código de Grupo</span>
-              <span className="text-2xl font-black text-cyan-400 font-mono tracking-widest">
-                {currentGroup?.inviteCode || 'RUN-4821'}
-              </span>
-            </div>
-
-            <button
-              onClick={() => setIsInviteOpen(false)}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
+      {/* Modal de Invitación / QR & WhatsApp */}
+      {isInviteOpen && currentGroup && (
+        <GroupShareModal
+          group={currentGroup}
+          onClose={() => setIsInviteOpen(false)}
+        />
       )}
 
     </div>

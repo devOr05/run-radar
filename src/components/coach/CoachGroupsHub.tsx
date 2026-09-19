@@ -17,6 +17,7 @@ import {
   Radio
 } from 'lucide-react';
 import { NewSessionModal } from './NewSessionModal';
+import { GroupShareModal } from './GroupShareModal';
 
 export const CoachGroupsHub: React.FC = () => {
   const { groups, athletes, setSelectedGroupId, activeSession, startSession } = useRadar();
@@ -219,52 +220,12 @@ export const CoachGroupsHub: React.FC = () => {
         </div>
       </div>
 
-      {/* QR Modal */}
+      {/* QR & WhatsApp Share Modal */}
       {selectedGroupForQR && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
-          onClick={() => setSelectedGroupForQR(null)}
-        >
-          <div 
-            className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mx-auto mb-4">
-              <QrCode className="w-6 h-6" />
-            </div>
-
-            <h3 className="text-lg font-bold text-white mb-1">
-              {selectedGroupForQR.name}
-            </h3>
-            <p className="text-xs text-slate-400 mb-6">
-              Los corredores ingresan este código o escanean para conectarse a tu sesión.
-            </p>
-
-            <div className="bg-white p-4 rounded-xl inline-block mb-4 shadow-inner">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                  `https://runradar.app/join?code=${selectedGroupForQR.inviteCode}`
-                )}`}
-                alt="QR de Invitación"
-                className="w-40 h-40"
-              />
-            </div>
-
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 mb-6">
-              <span className="text-[11px] text-slate-500 block uppercase font-semibold">Código de Grupo</span>
-              <span className="text-2xl font-black text-cyan-400 tracking-wider font-['JetBrains_Mono',monospace]">
-                {selectedGroupForQR.inviteCode}
-              </span>
-            </div>
-
-            <button
-              onClick={() => setSelectedGroupForQR(null)}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
+        <GroupShareModal
+          group={selectedGroupForQR}
+          onClose={() => setSelectedGroupForQR(null)}
+        />
       )}
 
       {/* Modal de Nueva Sesión */}

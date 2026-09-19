@@ -65,6 +65,83 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [userRole, setUserRole] = useState<'coach' | 'runner' | null>(null);
   const [currentRunnerId, setCurrentRunnerId] = useState<string | null>('athlete-1');
 
+  // 1. Detección de invitaciones por WhatsApp/QR (?join=...) y Auto-Login persistente del celular
+  useEffect(() => {
+    // Solicitar persistencia al sistema operativo móvil para evitar que borre datos
+    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().catch(() => {});
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinCode = urlParams.get('join');
+    const athleteParam = urlParams.get('atleta') || urlParams.get('athlete');
+
+    // Caso A: El corredor viene desde un link de WhatsApp o escaneó el QR
+    if (joinCode) {
+      setUserRole('runner');
+      if (athleteParam) {
+        setCurrentRunnerId(athleteParam);
+      }
+      localStorage.setItem('runradar_session', JSON.stringify({
+        role: 'runner',
+        groupCode: joinCode,
+        athleteId: athleteParam || 'athlete-1'
+      }));
+      return;
+    }
+
+    // Caso B: El dueño del teléfono ya usó la app instalada -> Auto-login instantáneo
+    try {
+      const saved = localStorage.getItem('runradar_session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.role) {
+          setUserRole(parsed.role);
+          if (parsed.athleteId) setCurrentRunnerId(parsed.athleteId);
+          if (parsed.groupId) setSelectedGroupId(parsed.groupId);
+        }
+      }
+    } catch (e) {
+      console.warn('Error al restaurar sesión previa del dispositivo', e);
+    }
+  }, []);
+
+  const handleSetUserRole = (role: 'coach' | 'runner' | null) => {
+    setUserRole(role);
+    if (role) {
+      try {
+        const currentSaved = localStorage.getItem('runradar_session');
+        const parsed = currentSaved ? JSON.parse(currentSaved) : {};
+        localStorage.setItem('runradar_session', JSON.stringify({
+          ...parsed,
+          role,
+          athleteId: role === 'runner' ? currentRunnerId : undefined
+        }));
+      } catch (e) {}
+    } else {
+      localStorage.removeItem('runradar_session');
+      setSelectedGroupId(null);
+      setSelectedAthleteId(null);
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  };
+
+  const handleSetCurrentRunnerId = (id: string | null) => {
+    setCurrentRunnerId(id);
+    if (id) {
+      try {
+        const currentSaved = localStorage.getItem('runradar_session');
+        const parsed = currentSaved ? JSON.parse(currentSaved) : { role: 'runner' };
+        localStorage.setItem('runradar_session', JSON.stringify({
+          ...parsed,
+          athleteId: id
+        }));
+      } catch (e) {}
+    }
+  };
+
   // Conectar con servidor Socket.io
   useEffect(() => {
     const s = io(window.location.origin, {
@@ -302,8 +379,8 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isConnected,
         setSelectedGroupId,
         setSelectedAthleteId,
-        setUserRole,
-        setCurrentRunnerId,
+        setUserRole: handleSetUserRole,
+        setCurrentRunnerId: handleSetCurrentRunnerId,
         startSession,
         pauseSession,
         stopSession,
