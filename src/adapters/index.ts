@@ -155,10 +155,25 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
 
     try {
       this.status = 'pending';
-      const device = await (navigator as any).bluetooth.requestDevice({
-        filters: [{ services: ['heart_rate'] }],
-        optionalServices: ['battery_service']
-      });
+      let device: any = null;
+
+      try {
+        device = await (navigator as any).bluetooth.requestDevice({
+          filters: [
+            { services: ['heart_rate'] }
+          ],
+          optionalServices: ['battery_service', 'heart_rate']
+        });
+      } catch (err: any) {
+        // Fallback: Si el Amazfit no anuncia el UUID de heart_rate en el paquete de advertisement inicial
+        if (err.name !== 'NotFoundError' || err.message?.includes('User cancelled')) {
+          throw err;
+        }
+        device = await (navigator as any).bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['heart_rate', 'battery_service']
+        });
+      }
 
       const server = await device.gatt.connect();
       const service = await server.getPrimaryService('heart_rate');
