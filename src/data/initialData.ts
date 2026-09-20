@@ -97,31 +97,24 @@ export const initialAthletes: Athlete[] = spanishFirstNames.slice(0, 18).map((fi
 
   const sample: MetricSample = {
     athleteId,
-    timestamp: Date.now() - 1000,
-    heartRate: hr,
-    zone: (i === 0 ? 5 : (hr > 150 ? 4 : (hr > 130 ? 3 : 2))) as any,
-    pace: basePace,
-    speed: basePace > 0 ? 3600 / basePace : 10,
-    cadence: 162 + ((i * 2) % 18),
-    distance: 4200 + (i * 120),
-    latitude: lat,
-    longitude: lng,
-    altitude: 25,
-    calories: 310 + (i * 15),
-    battery: i === 2 ? 8 : 88,
+    timestamp: Date.now(),
+    heartRate: undefined,
+    zone: undefined,
+    pace: undefined,
+    speed: 0,
+    cadence: 0,
+    distance: 0,
+    latitude: undefined,
+    longitude: undefined,
+    altitude: 0,
+    calories: 0,
+    battery: 100,
     signalQuality: 'excellent',
-    source: i % 2 === 0 ? 'smartwatch' : 'phone',
-    sourceDevice: i % 2 === 0 ? '⌚ Garmin Forerunner' : '📱 Celular GPS'
+    source: 'phone',
+    sourceDevice: '📱 Celular GPS'
   };
 
   const trail: [number, number][] = [];
-  for (let t = 10; t >= 0; t--) {
-    const pastAngle = angle - (t * 0.05);
-    trail.push([
-      centerLat + Math.sin(pastAngle) * radiusLat,
-      centerLng + Math.cos(pastAngle) * radiusLng
-    ]);
-  }
 
   return {
     id: athleteId,

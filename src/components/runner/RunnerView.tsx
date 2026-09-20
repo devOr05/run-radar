@@ -165,6 +165,43 @@ export const RunnerView: React.FC = () => {
     setShowEditProfileModal(false);
   };
 
+  // Cargar reloj previamente vinculado de forma permanente y auto-reconectar en segundo plano
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('runradar_paired_watch');
+      if (saved) {
+        const parsed = JSON.parse(saved) as BluetoothDeviceInfo;
+        setBleDeviceInfo(parsed);
+        // Intentar reconexión automática en segundo plano
+        const bleAdapter = new BluetoothHeartRateAdapter();
+        bleAdapter.tryAutoReconnect(parsed.id).then((reconnected) => {
+          if (reconnected) {
+            setBleAdapterInstance(bleAdapter);
+            setBluetoothStatus('connected');
+            const updatedInfo = bleAdapter.getDeviceInfo();
+            if (updatedInfo) {
+              setBleDeviceInfo(updatedInfo);
+              localStorage.setItem('runradar_paired_watch', JSON.stringify(updatedInfo));
+            }
+            bleAdapter.onDisconnect(() => {
+              setBluetoothStatus('idle');
+            });
+            bleAdapter.startStream((sample) => {
+              if (emitRunnerSample) {
+                emitRunnerSample({
+                  ...sample,
+                  sourceDevice: `⌚ ${updatedInfo?.name || parsed.name || 'Reloj Deportivo'}`
+                });
+              }
+            });
+          }
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Error al cargar reloj vinculado', e);
+    }
+  }, [emitRunnerSample]);
+
   const handleConnectBluetooth = async () => {
     setIsBluetoothConnecting(true);
     const bleAdapter = new BluetoothHeartRateAdapter();
@@ -176,9 +213,16 @@ export const RunnerView: React.FC = () => {
       setBleAdapterInstance(bleAdapter);
       setBluetoothStatus('connected');
 
+      // Guardar reloj vinculado de manera permanente
+      try {
+        if (info) {
+          localStorage.setItem('runradar_paired_watch', JSON.stringify(info));
+        }
+      } catch (e) {}
+
       bleAdapter.onDisconnect(() => {
         setBluetoothStatus('idle');
-        setBleDeviceInfo(null);
+        // No borramos bleDeviceInfo para mantenerlo vinculado en la UI
       });
 
       bleAdapter.startStream((sample) => {
@@ -201,6 +245,9 @@ export const RunnerView: React.FC = () => {
     setBleAdapterInstance(null);
     setBleDeviceInfo(null);
     setBluetoothStatus('idle');
+    try {
+      localStorage.removeItem('runradar_paired_watch');
+    } catch (e) {}
   };
 
   const sample = currentRunner?.lastSample;
@@ -777,42 +824,68 @@ export const RunnerView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Tarjeta de Reloj Vinculado o Botón de Conectar */}
-              {bluetoothStatus === 'connected' && bleDeviceInfo ? (
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 to-slate-900 border-2 border-emerald-500/50 shadow-xl space-y-3 animate-fadeIn">
+              {/* Tarjeta de Reloj Vinculado (Conectado o Reconectando/En reposo) */}
+              {bleDeviceInfo ? (
+                <div className={`p-4 rounded-2xl border-2 shadow-xl space-y-3 animate-fadeIn ${
+                  bluetoothStatus === 'connected' 
+                    ? 'bg-gradient-to-r from-emerald-950/40 to-slate-900 border-emerald-500/50' 
+                    : 'bg-slate-900/90 border-cyan-500/40'
+                }`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                        <Watch className="w-6 h-6 animate-pulse" />
+                      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
+                        bluetoothStatus === 'connected' 
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                          : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                      }`}>
+                        <Watch className={`w-6 h-6 ${bluetoothStatus === 'connected' ? 'animate-pulse' : ''}`} />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                          <span className={`w-2.5 h-2.5 rounded-full ${
+                            bluetoothStatus === 'connected' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'
+                          }`} />
                           <h4 className="text-sm font-black text-white tracking-wide">
                             {bleDeviceInfo.name}
                           </h4>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                            {bluetoothStatus === 'connected' ? 'EN VIVO' : 'VINCULADO'}
+                          </span>
                         </div>
-                        <div className="text-xs text-emerald-400 font-semibold mt-0.5">
+                        <div className="text-xs text-slate-300 font-semibold mt-0.5">
                           Marca: {bleDeviceInfo.manufacturer}
                           {bleDeviceInfo.model && bleDeviceInfo.model !== bleDeviceInfo.name ? ` • Modelo: ${bleDeviceInfo.model}` : ''}
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={handleDisconnectBluetooth}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/50 hover:border-rose-500/50 hover:text-rose-300 text-slate-300 border border-slate-700 text-xs font-bold transition shrink-0"
-                    >
-                      Desvincular
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {bluetoothStatus !== 'connected' && (
+                        <button
+                          onClick={handleConnectBluetooth}
+                          disabled={isBluetoothConnecting}
+                          className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black transition shrink-0"
+                        >
+                          {isBluetoothConnecting ? 'Conectando...' : 'Reconectar'}
+                        </button>
+                      )}
+                      <button
+                        onClick={handleDisconnectBluetooth}
+                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/50 hover:border-rose-500/50 hover:text-rose-300 text-slate-300 border border-slate-700 text-xs font-bold transition shrink-0"
+                      >
+                        Desvincular
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-emerald-500/20">
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-700/50">
                     <div className="bg-[#0B0F19] p-2.5 rounded-xl flex items-center gap-2 border border-radar-border">
                       <Heart className="w-4 h-4 text-rose-500 shrink-0" />
                       <div>
                         <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Sensor Cardíaco</span>
                         <span className="text-xs font-bold text-white">
-                          {bleDeviceInfo.hasHeartRate ? '✓ BLE HR Transmitiendo' : 'Buscando lectura...'}
+                          {bluetoothStatus === 'connected' 
+                            ? (hr !== null ? `${hr} BPM en vivo` : 'Esperando lectura...') 
+                            : 'En reposo'}
                         </span>
                       </div>
                     </div>
@@ -821,11 +894,30 @@ export const RunnerView: React.FC = () => {
                       <div>
                         <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Batería del Reloj</span>
                         <span className="text-xs font-bold text-emerald-400 font-mono">
-                          {bleDeviceInfo.batteryLevel !== undefined ? `${bleDeviceInfo.batteryLevel}%` : 'Conectado'}
+                          {bleDeviceInfo.batteryLevel !== undefined ? `${bleDeviceInfo.batteryLevel}%` : (bluetoothStatus === 'connected' ? 'OK' : 'Guardado')}
                         </span>
                       </div>
                     </div>
                   </div>
+
+                  {/* Guía Amazfit si no hay lectura de pulso */}
+                  {hr === null && (
+                    <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/40 text-[11px] text-cyan-200 flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1 leading-snug">
+                        <span className="font-bold text-cyan-300 block">¿Tu Amazfit no transmite el pulso al navegador?</span>
+                        <p className="text-slate-300">
+                          En Amazfit, la transmisión Bluetooth estándar viene apagada de fábrica. Actívala así:
+                          <br />
+                          1. Abre la app <b>Zepp</b> en tu móvil &gt; Pestaña <b>Perfil</b>.
+                          <br />
+                          2. Toca en <b>{bleDeviceInfo.name || 'Amazfit Bip 6'}</b>.
+                          <br />
+                          3. Ingresa a <b>Monitoreo de salud</b> &gt; Activa <b>"Compartir frecuencia cardíaca con dispositivos"</b>.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="p-4 rounded-2xl bg-radar-card border border-radar-border flex items-center justify-between">

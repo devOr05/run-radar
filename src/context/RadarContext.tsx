@@ -98,7 +98,7 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       localStorage.setItem('runradar_session', JSON.stringify({
         role: 'runner',
         groupCode: joinCode,
-        athleteId: athleteParam || 'athlete-1'
+        athleteId: athleteParam || null
       }));
       return;
     }
@@ -110,7 +110,12 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const parsed = JSON.parse(saved);
         if (parsed.role) {
           setUserRole(parsed.role);
-          if (parsed.athleteId) setCurrentRunnerId(parsed.athleteId);
+          // Si tenía 'athlete-1' guardado por el bug anterior pero sin URL param, no infectar con el mock
+          if (parsed.athleteId && parsed.athleteId !== 'athlete-1') {
+            setCurrentRunnerId(parsed.athleteId);
+          } else if (parsed.athleteId === 'athlete-1' && !athleteParam) {
+            setCurrentRunnerId(null);
+          }
           if (parsed.groupId) setSelectedGroupId(parsed.groupId);
         }
       }
@@ -248,7 +253,7 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const currentRunner = currentRunnerId 
     ? (athletes.find(a => a.id === currentRunnerId) || null) 
-    : (userRole === 'runner' ? null : (athletes[0] || null));
+    : null;
 
   const startSession = async (data: { name: string; groupId: string; targetDistanceKm: number; targetDurationMinutes: number }) => {
     const newSession: TrainingSession = {

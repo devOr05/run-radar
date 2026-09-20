@@ -74,7 +74,11 @@ export class PhoneSensorAdapter implements DeviceAdapter {
 
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        let speed = (pos.coords.speed || 0) * 3.6; // m/s a km/h
+        const accuracy = pos.coords.accuracy || 100;
+        let speed = (pos.coords.speed !== null && pos.coords.speed !== undefined && pos.coords.speed > 0)
+          ? pos.coords.speed * 3.6
+          : 0;
+
         if (this.lastPosition) {
           const dist = calculateDistanceBetweenCoordinates(
             this.lastPosition.coords.latitude,
@@ -82,11 +86,23 @@ export class PhoneSensorAdapter implements DeviceAdapter {
             pos.coords.latitude,
             pos.coords.longitude
           );
-          this.totalDistanceMeters += dist;
-        }
-        this.lastPosition = pos;
 
-        const pace = speed > 1 ? Math.round(3600 / speed) : undefined;
+          // FILTRO ANTI-RUIDO GPS:
+          // Solo sumar distancia si el movimiento es real (ignora deriva satelital de 2-4m en reposo)
+          const isRealMovement = accuracy < 35 && (
+            (speed > 1.2 && dist >= 3) ||
+            (dist >= 5)
+          );
+
+          if (isRealMovement) {
+            this.totalDistanceMeters += dist;
+            this.lastPosition = pos;
+          }
+        } else {
+          this.lastPosition = pos;
+        }
+
+        const pace = speed > 1.2 ? Math.round(3600 / speed) : undefined;
 
         this.onSampleCallback?.({
           source: 'phone',
@@ -98,7 +114,7 @@ export class PhoneSensorAdapter implements DeviceAdapter {
           speed: speed,
           pace: pace,
           distance: Math.round(this.totalDistanceMeters),
-          signalQuality: pos.coords.accuracy < 15 ? 'excellent' : 'good'
+          signalQuality: accuracy < 15 ? 'excellent' : 'good'
         });
       },
       (err) => {
@@ -179,7 +195,6 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
 
     try {
       this.status = 'pending';
-      // acceptAllDevices: true permite que Chrome liste el Amazfit Bip y cualquier reloj visible
       const device = await (navigator as any).bluetooth.requestDevice({
         acceptAllDevices: true,
         optionalServices: [
@@ -188,32 +203,67 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
           'device_information',
           0x180d,
           0x180f,
-          0x180a
+          0x180a,
+          0xfee0,
+          0xfee1
         ]
       });
 
+      return await this.connectWithDevice(device);
+    } catch (e) {
+      console.warn('Bluetooth requestDevice error:', e);
+      this.status = 'disconnected';
+      return false;
+    }
+  }
+
+  // Conectar con un dispositivo ya descubierto o pre-aprobado (para reconexión persistente)
+  async connectWithDevice(device: any): Promise<boolean> {
+    try {
+      this.status = 'pending';
       const server = await device.gatt.connect();
 
-      // Escuchar desconexión física o fuera de alcance
       device.addEventListener('gattserverdisconnected', () => {
         this.status = 'disconnected';
         this.onDisconnectCallback?.();
       });
 
       let hasHeartRate = false;
+      let hrService: any = null;
       try {
-        const service = await server.getPrimaryService('heart_rate');
-        this.characteristic = await service.getCharacteristic('heart_rate_measurement');
-        hasHeartRate = true;
-      } catch (svcErr) {
-        console.warn('El dispositivo se vinculó pero no expone servicio de frecuencia cardíaca estándar', svcErr);
+        hrService = await server.getPrimaryService('heart_rate');
+      } catch (e1) {
+        try {
+          hrService = await server.getPrimaryService(0x180d);
+        } catch (e2) {
+          try {
+            hrService = await server.getPrimaryService('0000180d-0000-1000-8000-00805f9b34fb');
+          } catch (e3) {}
+        }
+      }
+
+      if (hrService) {
+        try {
+          this.characteristic = await hrService.getCharacteristic('heart_rate_measurement');
+        } catch (c1) {
+          try {
+            this.characteristic = await hrService.getCharacteristic(0x2a37);
+          } catch (c2) {
+            try {
+              this.characteristic = await hrService.getCharacteristic('00002a37-0000-1000-8000-00805f9b34fb');
+            } catch (c3) {}
+          }
+        }
+        if (this.characteristic) {
+          hasHeartRate = true;
+        }
       }
 
       // Intentar leer nivel de batería del reloj vía BLE (0x180F)
       let readBat: number | undefined = undefined;
       try {
-        const batService = await server.getPrimaryService('battery_service');
-        const batChar = await batService.getCharacteristic('battery_level');
+        const batService = await server.getPrimaryService('battery_service').catch(() => server.getPrimaryService(0x180f));
+        const batChar = await batService.getCharacteristic('battery_level').catch(() => batService.getCharacteristic(0x2a19));
         const batVal = await batChar.readValue();
         readBat = batVal.getUint8(0);
         this.watchBattery = readBat ?? null;
@@ -225,14 +275,14 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
       let manufacturer = '';
       let model = '';
       try {
-        const infoService = await server.getPrimaryService('device_information');
+        const infoService = await server.getPrimaryService('device_information').catch(() => server.getPrimaryService(0x180a));
         try {
-          const mfgChar = await infoService.getCharacteristic('manufacturer_name_string');
+          const mfgChar = await infoService.getCharacteristic('manufacturer_name_string').catch(() => infoService.getCharacteristic(0x2a29));
           const mfgVal = await mfgChar.readValue();
           manufacturer = new TextDecoder().decode(mfgVal).replace(/\0/g, '').trim();
         } catch (e) {}
         try {
-          const modChar = await infoService.getCharacteristic('model_number_string');
+          const modChar = await infoService.getCharacteristic('model_number_string').catch(() => infoService.getCharacteristic(0x2a24));
           const modVal = await modChar.readValue();
           model = new TextDecoder().decode(modVal).replace(/\0/g, '').trim();
         } catch (e) {}
@@ -277,19 +327,42 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
       this.status = 'connected';
       return true;
     } catch (e) {
-      console.warn('Bluetooth HRM connection error:', e);
+      console.warn('Bluetooth connectWithDevice error:', e);
       this.status = 'disconnected';
       return false;
     }
   }
 
+  // Intentar reconexión automática sin diálogo modal a través de getDevices()
+  async tryAutoReconnect(savedDeviceId?: string): Promise<boolean> {
+    if (typeof navigator === 'undefined' || !(navigator as any).bluetooth?.getDevices) {
+      return false;
+    }
+    try {
+      const devices = await (navigator as any).bluetooth.getDevices();
+      if (!devices || devices.length === 0) return false;
+      const targetDevice = savedDeviceId
+        ? devices.find((d: any) => d.id === savedDeviceId) || devices[0]
+        : devices[0];
+      if (targetDevice) {
+        return await this.connectWithDevice(targetDevice);
+      }
+    } catch (e) {
+      console.warn('Auto-reconnect BLE error:', e);
+    }
+    return false;
+  }
+
   async disconnect(): Promise<void> {
     if (this.device && this.device.gatt?.connected) {
-      this.device.gatt.disconnect();
+      try {
+        this.device.gatt.disconnect();
+      } catch (e) {}
     }
     this.status = 'disconnected';
     this.deviceInfo = null;
     this.watchBattery = null;
+    this.characteristic = null;
   }
 
   startStream(onSample: (sample: Partial<MetricSample>) => void): void {
@@ -308,14 +381,18 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
           hr = value.getUint8(1);        // 8-bit HR
         }
 
-        this.onSampleCallback?.({
-          source: 'chest_strap',
-          sourceDevice: `⌚ ${this.deviceInfo?.name || this.device?.name || 'Reloj Bluetooth'}`,
-          timestamp: Date.now(),
-          heartRate: hr,
-          battery: this.watchBattery ?? undefined
-        });
+        if (hr > 30 && hr < 240) {
+          this.onSampleCallback?.({
+            source: 'chest_strap',
+            sourceDevice: `⌚ ${this.deviceInfo?.name || this.device?.name || 'Reloj Bluetooth'}`,
+            timestamp: Date.now(),
+            heartRate: hr,
+            battery: this.watchBattery ?? undefined
+          });
+        }
       });
+    }).catch((err: any) => {
+      console.warn('Error al iniciar notificaciones BLE de pulso:', err);
     });
   }
 
