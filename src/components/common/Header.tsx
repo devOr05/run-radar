@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRadar } from '../../context/RadarContext';
-import { Activity, Bell, Radio, User, Smartphone } from 'lucide-react';
+import { Activity, Bell, Radio, User, Smartphone, Crown } from 'lucide-react';
 
 interface HeaderProps {
   onOpenAlerts: () => void;
@@ -51,7 +51,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAlerts }) => {
 
           {/* Role Indicator Badge */}
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-medium text-slate-300">
-            {userRole === 'coach' ? (
+            {userRole === 'super_admin' ? (
+              <>
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-bold text-amber-400">Super Admin</span>
+              </>
+            ) : userRole === 'coach' ? (
               <>
                 <Activity className="w-3.5 h-3.5 text-cyan-400" />
                 <span className="font-bold text-cyan-400">Entrenador</span>

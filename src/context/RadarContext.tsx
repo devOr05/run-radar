@@ -8,7 +8,12 @@ import {
   AlertEvent, 
   MetricSample, 
   SimulatorConfig,
-  AthletePermissions
+  AthletePermissions,
+  UserRole,
+  CoachMessage,
+  GroupChatMessage,
+  GroupForumPost,
+  SUPER_ADMIN_EMAIL
 } from '../types';
 import { supabaseService, isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 import { 
@@ -28,14 +33,17 @@ interface RadarContextType {
   activeSession: TrainingSession | null;
   alerts: AlertEvent[];
   simulatorConfig: SimulatorConfig;
-  userRole: 'coach' | 'runner' | null;
+  userRole: UserRole | null;
   currentRunner: Athlete | null;
   isConnected: boolean;
+  coachMessages: CoachMessage[];
+  groupMessages: GroupChatMessage[];
+  forumPosts: GroupForumPost[];
   
   // Actions
   setSelectedGroupId: (id: string | null) => void;
   setSelectedAthleteId: (id: string | null) => void;
-  setUserRole: (role: 'coach' | 'runner' | null) => void;
+  setUserRole: (role: UserRole | null) => void;
   setCurrentRunnerId: (id: string | null) => void;
   startSession: (data: { name: string; groupId: string; targetDistanceKm: number; targetDurationMinutes: number }) => Promise<void>;
   pauseSession: () => Promise<void>;
@@ -54,6 +62,10 @@ interface RadarContextType {
   joinGroup: (codeOrUrl: string) => Promise<{ success: boolean; group?: Group; error?: string }>;
   leaveGroup: () => Promise<void>;
   exportCSV: (sessionId?: string) => void;
+  sendCoachMessage: (data: Omit<CoachMessage, 'id' | 'timestamp'>) => Promise<void>;
+  sendGroupChatMessage: (data: Omit<GroupChatMessage, 'id' | 'timestamp'>) => Promise<void>;
+  createForumPost: (data: Omit<GroupForumPost, 'id' | 'timestamp'>) => Promise<void>;
+  likeForumPost: (postId: string) => Promise<void>;
 }
 
 const RadarContext = createContext<RadarContextType | undefined>(undefined);
@@ -87,8 +99,60 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     noiseLevel: 'realistic',
     injectSpontaneousAlerts: false
   });
-  const [userRole, setUserRole] = useState<'coach' | 'runner' | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [currentRunnerId, setCurrentRunnerId] = useState<string | null>(null);
+
+  const [coachMessages, setCoachMessages] = useState<CoachMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('runradar_coach_messages');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [groupMessages, setGroupMessages] = useState<GroupChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('runradar_group_chat');
+      return saved ? JSON.parse(saved) : [
+        {
+          id: 'chat-welcome',
+          groupId: 'group-martes',
+          senderId: 'coach-juan',
+          senderName: 'Profesor Juan',
+          senderRole: 'coach',
+          text: '¡Bienvenidos al entrenamiento de hoy! Recuerden hidratarse antes de empezar.',
+          timestamp: Date.now() - 3600000
+        }
+      ];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [forumPosts, setForumPosts] = useState<GroupForumPost[]>(() => {
+    try {
+      const saved = localStorage.getItem('runradar_forum_posts');
+      return saved ? JSON.parse(saved) : [
+        {
+          id: 'post-1',
+          groupId: 'group-martes',
+          authorId: 'coach-juan',
+          authorName: 'Profesor Juan',
+          authorRole: 'coach',
+          title: 'Plan Semanal: Fondo Largo y Progresivo en Playa Grande',
+          content: 'Este sábado nos encontramos a las 8:00 AM en el punto de encuentro habitual para 12K progresivos. Traer botellita de hidratación y gorra.',
+          isPinned: true,
+          timestamp: Date.now() - 86400000,
+          likesCount: 14,
+          commentsCount: 5,
+          category: 'announcement'
+        }
+      ];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // 1. Detección de invitaciones por WhatsApp/QR (?join=...) y Auto-Login persistente del celular
   useEffect(() => {
@@ -136,7 +200,7 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  const handleSetUserRole = (role: 'coach' | 'runner' | null) => {
+  const handleSetUserRole = (role: UserRole | null) => {
     setUserRole(role);
     if (role) {
       try {
@@ -784,6 +848,92 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     window.open(`/api/sessions/${id}/export-csv`, '_blank');
   };
 
+  const triggerWatchNotification = (title: string, body: string) => {
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'granted') {
+          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(reg => {
+              reg.showNotification(title, {
+                body,
+                icon: '/favicon.ico',
+                vibrate: [300, 100, 300, 100, 400],
+                tag: 'coach-instruction'
+              } as any);
+            }).catch(() => {
+              new Notification(title, { body, icon: '/favicon.ico' });
+            });
+          } else {
+            new Notification(title, { body, icon: '/favicon.ico' });
+          }
+        } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission();
+        }
+      }
+    } catch (e) {
+      console.warn('Error al emitir notificación local:', e);
+    }
+  };
+
+  const sendCoachMessage = async (data: Omit<CoachMessage, 'id' | 'timestamp'>) => {
+    const newMsg: CoachMessage = {
+      ...data,
+      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      timestamp: Date.now(),
+      delivered: true
+    };
+    setCoachMessages(prev => [newMsg, ...prev]);
+
+    // Si es para mí o para todo el grupo, emitir notificación con vibración hacia el reloj
+    if (!data.targetAthleteId || data.targetAthleteId === currentRunnerId) {
+      triggerWatchNotification(`🏃 Orden del Entrenador (${data.coachName})`, data.text);
+    }
+
+    try {
+      const saved = localStorage.getItem('runradar_coach_messages');
+      const parsed = saved ? JSON.parse(saved) : [];
+      localStorage.setItem('runradar_coach_messages', JSON.stringify([newMsg, ...parsed].slice(0, 50)));
+    } catch (e) {}
+  };
+
+  const sendGroupChatMessage = async (data: Omit<GroupChatMessage, 'id' | 'timestamp'>) => {
+    const newMsg: GroupChatMessage = {
+      ...data,
+      id: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      timestamp: Date.now()
+    };
+    setGroupMessages(prev => [...prev, newMsg]);
+    try {
+      const saved = localStorage.getItem('runradar_group_chat');
+      const parsed = saved ? JSON.parse(saved) : [];
+      localStorage.setItem('runradar_group_chat', JSON.stringify([...parsed, newMsg].slice(-100)));
+    } catch (e) {}
+  };
+
+  const createForumPost = async (data: Omit<GroupForumPost, 'id' | 'timestamp'>) => {
+    const newPost: GroupForumPost = {
+      ...data,
+      id: `post-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      timestamp: Date.now()
+    };
+    setForumPosts(prev => [newPost, ...prev]);
+    try {
+      const saved = localStorage.getItem('runradar_forum_posts');
+      const parsed = saved ? JSON.parse(saved) : [];
+      localStorage.setItem('runradar_forum_posts', JSON.stringify([newPost, ...parsed]));
+    } catch (e) {}
+  };
+
+  const likeForumPost = async (postId: string) => {
+    setForumPosts(prev => {
+      const updated = prev.map(p => p.id === postId ? { ...p, likesCount: (p.likesCount || 0) + 1 } : p);
+      try {
+        localStorage.setItem('runradar_forum_posts', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
   return (
     <RadarContext.Provider
       value={{
@@ -798,6 +948,9 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         userRole,
         currentRunner,
         isConnected,
+        coachMessages,
+        groupMessages,
+        forumPosts,
         setSelectedGroupId,
         setSelectedAthleteId,
         setUserRole: handleSetUserRole,
@@ -819,6 +972,10 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         joinGroup,
         leaveGroup,
         exportCSV,
+        sendCoachMessage,
+        sendGroupChatMessage,
+        createForumPost,
+        likeForumPost,
       }}
     >
       {children}

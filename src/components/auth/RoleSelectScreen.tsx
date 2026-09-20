@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRadar } from '../../context/RadarContext';
+import { SUPER_ADMIN_EMAIL } from '../../types';
 import { 
   Radio, 
   Users, 
@@ -16,7 +17,8 @@ import {
   X,
   Share,
   PlusSquare,
-  HelpCircle
+  HelpCircle,
+  Crown
 } from 'lucide-react';
 
 export const RoleSelectScreen: React.FC = () => {
@@ -273,11 +275,41 @@ export const RoleSelectScreen: React.FC = () => {
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
+      </div>
 
+      {/* Acceso Maestro: Super Administrador (orostizagamario@gmail.com) */}
+      <div className="relative z-10 mt-6 max-w-4xl w-full">
+        <button
+          onClick={() => setUserRole('super_admin')}
+          className="w-full p-4 rounded-2xl bg-gradient-to-r from-amber-950/30 via-slate-900 to-indigo-950/30 border border-amber-500/30 hover:border-amber-400 text-slate-300 hover:text-white transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 group shadow-lg cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition shadow-inner">
+              <Crown className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                  Acceso Maestro • Super Administrador
+                </span>
+                <span className="text-[10px] font-mono text-amber-400 bg-amber-950 px-1.5 py-0.5 rounded border border-amber-800">
+                  ADMIN
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-400 block mt-0.5">
+                Visión general global de todos los grupos y corredores ({SUPER_ADMIN_EMAIL})
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400 shrink-0 self-end sm:self-center">
+            <span>Entrar al Centro de Control</span>
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </button>
       </div>
 
       {/* Footer info */}
-      <div className="relative z-10 mt-12 text-center text-xs text-slate-500">
+      <div className="relative z-10 mt-10 text-center text-xs text-slate-500">
         RunRadar &copy; 2026 — Plataforma de Telemetría para Entrenadores y Grupos de Running
       </div>
 

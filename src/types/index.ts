@@ -173,3 +173,60 @@ export interface HistorySummary {
     heartRate: 'improving' | 'stable' | 'declining';
   };
 }
+
+export const SUPER_ADMIN_EMAIL = 'orostizagamario@gmail.com';
+
+export type UserRole = 'super_admin' | 'coach' | 'runner';
+
+export interface CoachMessage {
+  id: string;
+  coachId: string;
+  coachName: string;
+  targetAthleteId?: string; // Si no está presente, es para todo el grupo/pelotón
+  targetAthleteName?: string;
+  groupId: string;
+  text: string;
+  type: 'instruction' | 'warning' | 'cheer' | 'hydration';
+  timestamp: number;
+  delivered?: boolean;
+}
+
+export interface GroupChatMessage {
+  id: string;
+  groupId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'coach' | 'runner' | 'super_admin';
+  text: string;
+  timestamp: number;
+}
+
+export interface GroupForumPost {
+  id: string;
+  groupId: string;
+  authorId: string;
+  authorName: string;
+  authorRole: 'coach' | 'runner' | 'super_admin';
+  title: string;
+  content: string;
+  isPinned?: boolean;
+  timestamp: number;
+  likesCount: number;
+  commentsCount: number;
+  category?: 'announcement' | 'training' | 'race' | 'social';
+}
+
+export interface AICoachingSuggestion {
+  id: string;
+  athleteId: string;
+  athleteName: string;
+  groupId: string;
+  type: 'overexertion' | 'pace_drop' | 'cadence_fatigue' | 'gap_alert' | 'hydration';
+  priority: 'high' | 'medium' | 'low';
+  currentValue: string;
+  triggerReason: string;
+  suggestedAction: string;
+  suggestedMessage: string;
+  timestamp: number;
+}
+

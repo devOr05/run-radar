@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { RadarProvider, useRadar } from './context/RadarContext';
 import { Header } from './components/common/Header';
 import { RoleSelectScreen } from './components/auth/RoleSelectScreen';
+import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { CoachGroupsHub } from './components/coach/CoachGroupsHub';
 import { CoachDashboard } from './components/coach/CoachDashboard';
 import { RunnerView } from './components/runner/RunnerView';
@@ -28,7 +29,9 @@ const AppContent: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 pb-16">
-        {userRole === 'coach' ? (
+        {userRole === 'super_admin' ? (
+          <SuperAdminDashboard />
+        ) : userRole === 'coach' ? (
           selectedGroupId ? (
             <CoachDashboard />
           ) : (

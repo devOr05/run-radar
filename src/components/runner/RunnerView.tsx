@@ -26,13 +26,32 @@ import {
   Hash,
   LogOut,
   Pencil,
-  RefreshCw
+  RefreshCw,
+  MessageSquare,
+  Pin,
+  UserCheck
 } from 'lucide-react';
 import { formatPace, formatDistance, formatDuration, calculateHeartRateZone, getZoneDetails } from '../../lib/calculations';
 import { QRScannerModal } from './QRScannerModal';
+import { GroupChatDrawer } from '../chat/GroupChatDrawer';
+import { GroupForumView } from '../forum/GroupForumView';
 
 export const RunnerView: React.FC = () => {
-  const { currentRunner, joinRunner, updateRunnerPermissions, updateRunnerProfile, joinGroup, leaveGroup, groups, athletes, coach, emitRunnerSample } = useRadar();
+  const { 
+    currentRunner, 
+    joinRunner, 
+    updateRunnerPermissions, 
+    updateRunnerProfile, 
+    joinGroup, 
+    leaveGroup, 
+    groups, 
+    athletes, 
+    coach, 
+    emitRunnerSample,
+    setUserRole,
+    coachMessages,
+    groupMessages
+  } = useRadar();
 
   // Pasos de Onboarding: 1. Intro, 2. Datos, 3. Entrenador, 4. Permisos, 5. Mi Entrenamiento (Listo)
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(currentRunner ? 5 : 1);
@@ -101,7 +120,8 @@ export const RunnerView: React.FC = () => {
   const [isBluetoothConnecting, setIsBluetoothConnecting] = useState(false);
   const [isScanningHr, setIsScanningHr] = useState(false);
   const [bluetoothStatus, setBluetoothStatus] = useState<'idle' | 'connected' | 'reconnecting' | 'unsupported'>('idle');
-  const [activeScreenTab, setActiveScreenTab] = useState<'individual' | 'collective' | 'permissions'>('individual');
+  const [activeScreenTab, setActiveScreenTab] = useState<'individual' | 'collective' | 'forum' | 'permissions'>('individual');
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Conectar adaptador local de Sensores del Celular (GPS + acelerómetro)
   useEffect(() => {
@@ -315,6 +335,17 @@ export const RunnerView: React.FC = () => {
   // Cálculos de Estado Colectivo del Grupo
   const runnerGroup = groups.find(g => currentRunner?.groupIds?.includes(g.id)) || null;
   const isCoachConnected = !!runnerGroup;
+
+  // Última instrucción táctica enviada por el entrenador hacia este corredor o al grupo
+  const latestCoachMessage = useMemo(() => {
+    if (!coachMessages || coachMessages.length === 0) return null;
+    return coachMessages.find(m => {
+      if (m.targetAthleteId && currentRunner && m.targetAthleteId === currentRunner.id) return true;
+      if (!m.targetAthleteId && runnerGroup && m.groupId === runnerGroup.id) return true;
+      return false;
+    }) || null;
+  }, [coachMessages, currentRunner, runnerGroup]);
+
   const groupAthletes = useMemo(() => {
     if (!runnerGroup) return currentRunner ? [currentRunner] : [];
     return athletes.filter(a => a.groupIds.includes(runnerGroup.id));
@@ -522,29 +553,10 @@ export const RunnerView: React.FC = () => {
                   placeholder="Ej: RUN-4821 o Grupo Martes"
                   className="w-full bg-[#0B0F19] border-2 border-cyan-500/50 rounded-2xl px-4 py-3.5 text-center text-lg font-bold text-cyan-400 focus:outline-none focus:border-cyan-400 placeholder:text-slate-600 placeholder:text-sm placeholder:font-normal"
                 />
+                <p className="text-[11px] text-slate-400 mt-1.5 text-center">
+                  🔒 El código de invitación es privado y te lo suministra tu entrenador.
+                </p>
               </div>
-
-              {/* Grupos disponibles para seleccionar con un clic */}
-              {groups.length > 0 && !matchedOnboardingGroup && (
-                <div className="pt-2 space-y-1.5">
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
-                    O toca tu grupo para seleccionarlo:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {groups.map((g) => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => setInviteCode(g.name)}
-                        className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 text-xs font-medium transition flex items-center gap-1.5"
-                      >
-                        <span>{g.name}</span>
-                        <span className="text-[10px] text-cyan-400 font-mono">({g.inviteCode})</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Tarjeta de Confirmación de Grupo Detectado */}
@@ -758,18 +770,28 @@ export const RunnerView: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    if (confirm('¿Deseas desconectarte del grupo y volver a Modo Libre?')) {
-                      await leaveGroup();
-                    }
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 hover:border-rose-500/50 hover:text-rose-300 text-slate-300 border border-slate-700 text-[11px] font-bold transition flex items-center gap-1 shrink-0"
-                  title="Desconectar del grupo"
-                >
-                  <LogOut className="w-3 h-3" />
-                  <span>Salir</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsChatOpen(true)}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold transition flex items-center gap-1 shrink-0"
+                    title="Chat del Grupo"
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    <span>Chat</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (confirm('¿Deseas desconectarte del grupo y volver a Modo Libre?')) {
+                        await leaveGroup();
+                      }
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 hover:border-rose-500/50 hover:text-rose-300 text-slate-300 border border-slate-700 text-[11px] font-bold transition flex items-center gap-1 shrink-0"
+                    title="Desconectar del grupo"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    <span>Salir</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/30 via-slate-900 to-[#0B0F19] border border-amber-500/40 shadow-lg space-y-2.5 animate-fadeIn">
@@ -808,38 +830,78 @@ export const RunnerView: React.FC = () => {
                     <span>Código o Nombre</span>
                   </button>
                 </div>
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">¿Sos profesor o entrenador?</span>
+                  <button
+                    onClick={() => setUserRole('coach')}
+                    className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 transition"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Convertirme en Entrenador →</span>
+                  </button>
+                </div>
               </div>
             )}
 
-            {/* Navigation Tabs (3 columnas balanceadas para móviles) */}
-            <div className="grid grid-cols-3 bg-[#0B0F19] p-1 rounded-2xl border border-radar-border text-xs gap-1">
+            {/* Mensaje Táctico del Entrenador */}
+            {latestCoachMessage && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/60 via-slate-900 to-orange-950/40 border-2 border-amber-500/60 shadow-xl flex items-start gap-3 animate-pulse">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <Watch className="w-5 h-5 text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                      ⚡ ORDEN TÁCTICA DEL ENTRENADOR • VIBRACIÓN AL RELOJ
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {latestCoachMessage.coachName || 'Entrenador'}
+                    </span>
+                  </div>
+                  <p className="text-sm font-black text-white mt-0.5">
+                    "{latestCoachMessage.text}"
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation Tabs (4 columnas para móviles) */}
+            <div className="grid grid-cols-4 bg-[#0B0F19] p-1 rounded-2xl border border-radar-border text-xs gap-1">
               <button
                 onClick={() => setActiveScreenTab('individual')}
-                className={`py-2 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 ${
+                className={`py-2 px-1 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
                   activeScreenTab === 'individual' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Activity className="w-3.5 h-3.5 shrink-0" />
-                <span>Mi Estado</span>
+                <span className="truncate">Mi Estado</span>
               </button>
               <button
                 onClick={() => setActiveScreenTab('collective')}
-                className={`py-2 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 ${
+                className={`py-2 px-1 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
                   activeScreenTab === 'collective' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Users className="w-3.5 h-3.5 shrink-0" />
-                <span>Pelotón</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="truncate">Pelotón</span>
+              </button>
+              <button
+                onClick={() => setActiveScreenTab('forum')}
+                className={`py-2 px-1 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  activeScreenTab === 'forum' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Pin className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Foro</span>
               </button>
               <button
                 onClick={() => setActiveScreenTab('permissions')}
-                className={`py-2 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 ${
+                className={`py-2 px-1 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
                   activeScreenTab === 'permissions' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                <span>Permisos</span>
+                <span className="truncate">Permisos</span>
               </button>
             </div>
           </div>
@@ -1292,7 +1354,35 @@ export const RunnerView: React.FC = () => {
             )
           )}
 
-          {/* ================= TAB 3: PERMISOS Y PRIVACIDAD ================= */}
+          {/* ================= TAB 3: FORO / MURO COMUNITARIO ================= */}
+          {activeScreenTab === 'forum' && (
+            <div className="space-y-4 animate-fadeIn">
+              {runnerGroup ? (
+                <GroupForumView groupId={runnerGroup.id} />
+              ) : (
+                <div className="text-center py-12 bg-radar-card rounded-3xl border border-radar-border p-6 shadow-xl">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-3 text-amber-400">
+                    <Pin className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-base font-bold text-white mb-1">Muro del Grupo no Disponible en Modo Libre</h3>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
+                    Para interactuar en el foro comunitario, ver comunicados fijados de tu entrenador y compartir con tus compañeros de pelotón, únete a un grupo.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setJoinModalInitialTab('code');
+                      setShowJoinModal(true);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs transition shadow-lg shadow-cyan-500/20"
+                  >
+                    Vincular a mi Grupo de Running
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= TAB 4: PERMISOS Y PRIVACIDAD ================= */}
           {activeScreenTab === 'permissions' && (
             <div className="bg-radar-card border border-radar-border rounded-3xl p-6 shadow-xl space-y-4">
               <div className="flex items-center gap-2 mb-2">
@@ -1330,6 +1420,23 @@ export const RunnerView: React.FC = () => {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Botón flotante de Chat del Pelotón */}
+          {runnerGroup && (
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="fixed bottom-6 right-6 z-40 p-3.5 rounded-full bg-cyan-500 hover:bg-cyan-400 text-black shadow-2xl shadow-cyan-500/40 font-black text-xs flex items-center gap-2 border-2 border-cyan-300 transition transform hover:scale-105 cursor-pointer"
+              title="Abrir chat del pelotón"
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span className="hidden sm:inline">Chat</span>
+              {groupMessages && (
+                <span className="px-1.5 py-0.5 rounded-full bg-black text-cyan-400 text-[10px] font-mono font-bold">
+                  {groupMessages.filter(m => m.groupId === runnerGroup.id).length}
+                </span>
+              )}
+            </button>
           )}
 
         </div>
@@ -1430,6 +1537,13 @@ export const RunnerView: React.FC = () => {
         onJoin={joinGroup}
         initialTab={joinModalInitialTab}
         availableGroups={groups}
+      />
+
+      {/* Drawer de Chat en Vivo del Pelotón */}
+      <GroupChatDrawer
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        groupId={runnerGroup?.id || 'general'}
       />
 
     </div>
