@@ -243,6 +243,19 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
         }
       }
 
+      if (!hrService) {
+        try {
+          const allServices = await server.getPrimaryServices();
+          for (const s of allServices) {
+            const uuid = String(s.uuid).toLowerCase();
+            if (uuid.includes('180d') || uuid.includes('heart_rate')) {
+              hrService = s;
+              break;
+            }
+          }
+        } catch (e4) {}
+      }
+
       if (hrService) {
         try {
           this.characteristic = await hrService.getCharacteristic('heart_rate_measurement');
@@ -252,7 +265,17 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
           } catch (c2) {
             try {
               this.characteristic = await hrService.getCharacteristic('00002a37-0000-1000-8000-00805f9b34fb');
-            } catch (c3) {}
+            } catch (c3) {
+              try {
+                const chars = await hrService.getCharacteristics();
+                for (const ch of chars) {
+                  if (String(ch.uuid).toLowerCase().includes('2a37') || ch.properties?.notify) {
+                    this.characteristic = ch;
+                    break;
+                  }
+                }
+              } catch (c4) {}
+            }
           }
         }
         if (this.characteristic) {

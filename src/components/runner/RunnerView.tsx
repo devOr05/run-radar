@@ -936,8 +936,12 @@ export const RunnerView: React.FC = () => {
                         <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Sensor Cardíaco</span>
                         <span className="text-xs font-bold text-white truncate block">
                           {bluetoothStatus === 'connected' 
-                            ? (hr !== null ? `${hr} BPM en vivo` : 'Esperando lectura...') 
-                            : 'En reposo'}
+                            ? (hr !== null 
+                                ? `${hr} BPM en vivo` 
+                                : (bleDeviceInfo.hasHeartRate 
+                                    ? 'Esperando lectura...' 
+                                    : 'Zepp HR no activo')) 
+                            : 'En reposo (Reconectar)'}
                         </span>
                       </div>
                     </div>
