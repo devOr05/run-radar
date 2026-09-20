@@ -10,7 +10,14 @@ import {
   SimulatorConfig,
   AthletePermissions
 } from '../types';
-import { supabaseService, isSupabaseConfigured } from '../lib/supabaseClient';
+import { supabaseService, isSupabaseConfigured, supabase } from '../lib/supabaseClient';
+import { 
+  initialCoach, 
+  initialGroups, 
+  initialAthletes, 
+  initialActiveSession, 
+  initialAlerts 
+} from '../data/initialData';
 
 interface RadarContextType {
   coach: Coach | null;
@@ -49,15 +56,15 @@ const RadarContext = createContext<RadarContextType | undefined>(undefined);
 export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [coach, setCoach] = useState<Coach | null>(null);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [athletes, setAthletes] = useState<Athlete[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [coach, setCoach] = useState<Coach | null>(initialCoach);
+  const [groups, setGroups] = useState<Group[]>(initialGroups);
+  const [athletes, setAthletes] = useState<Athlete[]>(initialAthletes);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>('group-martes');
   const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(null);
-  const [activeSession, setActiveSession] = useState<TrainingSession | null>(null);
-  const [alerts, setAlerts] = useState<AlertEvent[]>([]);
+  const [activeSession, setActiveSession] = useState<TrainingSession | null>(initialActiveSession);
+  const [alerts, setAlerts] = useState<AlertEvent[]>(initialAlerts);
   const [simulatorConfig, setSimulatorConfig] = useState<SimulatorConfig>({
-    athleteCount: 50,
+    athleteCount: 25,
     playbackSpeed: 1,
     isRunning: true,
     noiseLevel: 'realistic',
@@ -234,157 +241,265 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [selectedGroupId]);
 
+  // Simulación en tiempo real en el cliente cuando el servidor Node no está conectado (ej. Vercel)
+  useEffect(() => {
+    if (isConnected || !simulatorConfig.isRunning) return;
+
+    const interval = setInterval(() => {
+      setAthletes((prevAthletes) => {
+        return prevAthletes.map((ath, idx) => {
+          const prevSample = ath.lastSample;
+          const currentAngle = (prevSample?.latitude ? Math.atan2(prevSample.latitude - (-34.5711), (prevSample.longitude || -58.4173) - (-58.4173)) : (idx / 18) * Math.PI * 2) + (0.015 * simulatorConfig.playbackSpeed);
+          
+          const newLat = -34.5711 + Math.sin(currentAngle) * 0.0045;
+          const newLng = -58.4173 + Math.cos(currentAngle) * 0.0060;
+          
+          const hrJitter = (Math.random() - 0.5) * 2;
+          const baseHr = ath.currentStatus === 'alert' ? 182 : 145 + ((idx * 3) % 20);
+          const newHr = Math.min(195, Math.max(110, Math.round((prevSample?.heartRate || baseHr) + hrJitter)));
+          
+          const updatedTrail = ath.trail ? [...ath.trail] : [];
+          updatedTrail.push([newLat, newLng]);
+          if (updatedTrail.length > 30) updatedTrail.shift();
+
+          const sample: MetricSample = {
+            athleteId: ath.id,
+            timestamp: Date.now(),
+            heartRate: newHr,
+            zone: (newHr > 175 ? 5 : (newHr > 155 ? 4 : (newHr > 135 ? 3 : 2))) as any,
+            pace: Math.round((ath.targetPaceMin || 330) + (Math.sin(Date.now() / 10000) * 15)),
+            speed: 10.5,
+            cadence: 165 + ((idx * 2) % 15),
+            distance: (prevSample?.distance || 4000) + Math.round(2.8 * simulatorConfig.playbackSpeed),
+            latitude: newLat,
+            longitude: newLng,
+            altitude: 25,
+            battery: prevSample?.battery ?? 85,
+            signalQuality: 'excellent',
+            source: 'phone',
+            sourceDevice: '📱 RunRadar App'
+          };
+
+          return {
+            ...ath,
+            lastSample: sample,
+            lastSeen: Date.now(),
+            trail: updatedTrail
+          };
+        });
+      });
+    }, 1000 / simulatorConfig.playbackSpeed);
+
+    return () => clearInterval(interval);
+  }, [isConnected, simulatorConfig.isRunning, simulatorConfig.playbackSpeed]);
+
   const currentRunner = athletes.find(a => a.id === currentRunnerId) || athletes[0] || null;
 
   const startSession = async (data: { name: string; groupId: string; targetDistanceKm: number; targetDurationMinutes: number }) => {
+    const newSession: TrainingSession = {
+      id: `session-${Date.now()}`,
+      groupId: data.groupId || 'group-martes',
+      coachId: coach?.id || 'coach-juan',
+      name: data.name || 'Entrenamiento Grupal',
+      startTime: Date.now(),
+      status: 'active',
+      targetDistanceKm: Number(data.targetDistanceKm) || 8,
+      targetDurationMinutes: Number(data.targetDurationMinutes) || 60,
+      targetZones: [2, 3, 4],
+      stats: {
+        avgHeartRate: 152,
+        totalDistanceKm: 0,
+        activeAthletes: athletes.length,
+        alertsCount: alerts.length,
+        durationSeconds: 0
+      }
+    };
+    setActiveSession(newSession);
+    setSimulatorConfig(prev => ({ ...prev, isRunning: true }));
+
     try {
-      const res = await fetch('/api/sessions/start', {
+      fetch('/api/sessions/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        const session = await res.json();
-        setActiveSession(session);
-        setSimulatorConfig(prev => ({ ...prev, isRunning: true }));
-      }
-    } catch (e) {
-      console.error('Error starting session', e);
-    }
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   const pauseSession = async () => {
+    setActiveSession(prev => prev ? { ...prev, status: prev.status === 'active' ? 'paused' : 'active' } : null);
+    setSimulatorConfig(prev => ({ ...prev, isRunning: !prev.isRunning }));
     try {
-      const res = await fetch('/api/sessions/pause', { method: 'POST' });
-      if (res.ok) {
-        const session = await res.json();
-        setActiveSession(session);
-        setSimulatorConfig(prev => ({ ...prev, isRunning: session.status === 'active' }));
-      }
-    } catch (e) {
-      console.error('Error pausing session', e);
-    }
+      fetch('/api/sessions/pause', { method: 'POST' }).catch(() => {});
+    } catch (e) {}
   };
 
   const stopSession = async () => {
+    setActiveSession(null);
+    setSimulatorConfig(prev => ({ ...prev, isRunning: false }));
     try {
-      const res = await fetch('/api/sessions/stop', { method: 'POST' });
-      if (res.ok) {
-        setActiveSession(null);
-        setSimulatorConfig(prev => ({ ...prev, isRunning: false }));
-      }
-    } catch (e) {
-      console.error('Error stopping session', e);
-    }
+      fetch('/api/sessions/stop', { method: 'POST' }).catch(() => {});
+    } catch (e) {}
   };
 
   const acknowledgeAlert = async (alertId: string) => {
+    setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: true } : a));
     try {
-      await fetch(`/api/alerts/${alertId}/ack`, { method: 'POST' });
-      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: true } : a));
-    } catch (e) {
-      console.error('Error acknowledging alert', e);
-    }
+      fetch(`/api/alerts/${alertId}/ack`, { method: 'POST' }).catch(() => {});
+    } catch (e) {}
   };
 
   const toggleSimulator = async () => {
-    const endpoint = simulatorConfig.isRunning ? '/api/simulator/pause' : '/api/simulator/start';
+    setSimulatorConfig(prev => ({ ...prev, isRunning: !prev.isRunning }));
     try {
-      const res = await fetch(endpoint, { method: 'POST' });
-      if (res.ok) {
-        const cfg = await res.json();
-        setSimulatorConfig(cfg);
-      }
-    } catch (e) {
-      console.error('Error toggling simulator', e);
-    }
+      const endpoint = simulatorConfig.isRunning ? '/api/simulator/pause' : '/api/simulator/start';
+      fetch(endpoint, { method: 'POST' }).catch(() => {});
+    } catch (e) {}
   };
 
   const setSimulatorSpeed = async (speed: 1 | 2 | 5) => {
+    setSimulatorConfig(prev => ({ ...prev, playbackSpeed: speed }));
     try {
-      const res = await fetch('/api/simulator/speed', {
+      fetch('/api/simulator/speed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ speed })
-      });
-      if (res.ok) {
-        const cfg = await res.json();
-        setSimulatorConfig(cfg);
-      }
-    } catch (e) {
-      console.error('Error setting simulator speed', e);
-    }
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   const resetSimulator = async () => {
+    setAthletes(initialAthletes);
+    setAlerts(initialAlerts);
     try {
-      const res = await fetch('/api/simulator/reset', { method: 'POST' });
-      if (res.ok) {
-        const cfg = await res.json();
-        setSimulatorConfig(cfg);
-      }
-    } catch (e) {
-      console.error('Error resetting simulator', e);
-    }
+      fetch('/api/simulator/reset', { method: 'POST' }).catch(() => {});
+    } catch (e) {}
   };
 
   const injectAlert = async (athleteId: string, alertType: 'high_hr' | 'z5' | 'low_battery' | 'disconnect') => {
+    const athlete = athletes.find(a => a.id === athleteId);
+    const newAlert: AlertEvent = {
+      id: `alert-${Date.now()}`,
+      athleteId,
+      athleteName: athlete ? `${athlete.name} ${athlete.lastName}` : 'Atleta',
+      groupId: selectedGroupId || 'group-martes',
+      ruleType: alertType === 'high_hr' ? 'heart_rate_max' : 'low_battery',
+      severity: alertType === 'high_hr' ? 'alert' : 'attention',
+      title: alertType === 'high_hr' ? 'FC elevada' : 'Batería baja',
+      message: alertType === 'high_hr' ? 'FC superior a 180 BPM' : 'Nivel de batería crítico',
+      timestamp: Date.now(),
+      acknowledged: false,
+      valueRecorded: alertType === 'high_hr' ? '184 BPM' : '9%'
+    };
+    setAlerts(prev => [newAlert, ...prev]);
     try {
-      await fetch('/api/simulator/inject-alert', {
+      fetch('/api/simulator/inject-alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ athleteId, type: alertType })
-      });
-    } catch (e) {
-      console.error('Error injecting alert', e);
-    }
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   const clearAlert = async (athleteId: string) => {
+    setAlerts(prev => prev.filter(a => a.athleteId !== athleteId));
     try {
-      await fetch('/api/simulator/clear-alert', {
+      fetch('/api/simulator/clear-alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ athleteId })
-      });
-    } catch (e) {
-      console.error('Error clearing alert', e);
-    }
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   const joinRunner = async (data: { name: string; lastName: string; email: string; inviteCode: string; permissions: AthletePermissions }) => {
+    const matchedGroup = groups.find(g => g.inviteCode?.toUpperCase() === data.inviteCode?.trim()?.toUpperCase()) || groups[0];
+    const newId = `athlete-${Date.now()}`;
+    const newAthlete: Athlete = {
+      id: newId,
+      name: data.name || 'Nuevo',
+      lastName: data.lastName || 'Corredor',
+      email: data.email || `${newId}@runradar.app`,
+      groupIds: [matchedGroup ? matchedGroup.id : 'group-martes'],
+      maxHeartRate: 185,
+      restingHeartRate: 60,
+      targetPaceMin: matchedGroup?.targetPaceRange?.[0] || 330,
+      targetPaceMax: matchedGroup?.targetPaceRange?.[1] || 375,
+      currentStatus: 'normal',
+      lastSeen: Date.now(),
+      devices: [
+        {
+          id: `dev-${newId}-phone`,
+          type: 'phone',
+          name: '📱 Celular Principal',
+          status: 'connected',
+          isPrimaryGPS: true,
+          batteryLevel: 98
+        }
+      ],
+      permissions: data.permissions || {
+        heartRate: true,
+        location: true,
+        workouts: true,
+        steps: true,
+        cadence: true,
+        elevation: true,
+        calories: true,
+        wearables: true,
+        updatedAt: Date.now()
+      }
+    };
+
+    // Intentar backend si existe
     try {
-      const res = await fetch('/api/runners/join', {
+      fetch('/api/runners/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
-      });
-      const result = await res.json();
-      if (res.ok && result.success) {
-        setAthletes(prev => [...prev, result.athlete]);
-        setCurrentRunnerId(result.athlete.id);
-        return { success: true, athlete: result.athlete };
-      }
-      return { success: false, error: result.error || 'Error al unirse al grupo' };
-    } catch (e) {
-      return { success: false, error: 'Error de conexión con el servidor' };
+      }).catch(() => {});
+    } catch (e) {}
+
+    // Guardar en Supabase si está disponible
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('athletes').upsert({
+        id: newAthlete.id,
+        name: newAthlete.name,
+        last_name: newAthlete.lastName,
+        email: newAthlete.email,
+        group_ids: newAthlete.groupIds,
+        max_heart_rate: newAthlete.maxHeartRate,
+        resting_heart_rate: newAthlete.restingHeartRate,
+        permissions: newAthlete.permissions
+      }).then(() => {}, (err: any) => console.warn('Supabase athlete insert err', err));
     }
+
+    setAthletes(prev => [...prev.filter(a => a.id !== newAthlete.id), newAthlete]);
+    setCurrentRunnerId(newAthlete.id);
+    if (matchedGroup) setSelectedGroupId(matchedGroup.id);
+
+    try {
+      localStorage.setItem('runradar_session', JSON.stringify({
+        role: 'runner',
+        athleteId: newAthlete.id,
+        groupId: matchedGroup ? matchedGroup.id : 'group-martes'
+      }));
+    } catch (e) {}
+
+    return { success: true, athlete: newAthlete };
   };
 
   const updateRunnerPermissions = async (athleteId: string, permissions: Partial<AthletePermissions>) => {
+    setAthletes(prev => prev.map(a => a.id === athleteId ? {
+      ...a,
+      permissions: { ...a.permissions, ...permissions, updatedAt: Date.now() }
+    } : a));
     try {
-      const res = await fetch(`/api/runners/${athleteId}/permissions`, {
+      fetch(`/api/runners/${athleteId}/permissions`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(permissions)
-      });
-      if (res.ok) {
-        const result = await res.json();
-        setAthletes(prev => prev.map(a => a.id === athleteId ? { ...a, permissions: result.permissions } : a));
-      }
-    } catch (e) {
-      console.error('Error updating permissions', e);
-    }
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   const exportCSV = (sessionId?: string) => {
