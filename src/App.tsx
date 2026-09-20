@@ -5,14 +5,12 @@ import { RoleSelectScreen } from './components/auth/RoleSelectScreen';
 import { CoachGroupsHub } from './components/coach/CoachGroupsHub';
 import { CoachDashboard } from './components/coach/CoachDashboard';
 import { RunnerView } from './components/runner/RunnerView';
-import { SimulatorControlBar } from './components/simulator/SimulatorControlBar';
 import { AlertsDrawer } from './components/coach/AlertsDrawer';
 import { AthleteDetailModal } from './components/coach/AthleteDetailModal';
 
 const AppContent: React.FC = () => {
   const { userRole, selectedGroupId, athletes, selectedAthleteId, setSelectedAthleteId } = useRadar();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
-  const [isSimulatorOpen, setIsSimulatorOpen] = useState(true);
 
   const selectedAthlete = athletes.find(a => a.id === selectedAthleteId) || null;
 
@@ -26,14 +24,7 @@ const AppContent: React.FC = () => {
       {/* Header */}
       <Header
         onOpenAlerts={() => setIsAlertsOpen(true)}
-        onOpenSimulator={() => setIsSimulatorOpen(!isSimulatorOpen)}
-        isSimulatorOpen={isSimulatorOpen}
       />
-
-      {/* Barra del Simulador (si está activa) */}
-      {isSimulatorOpen && (
-        <SimulatorControlBar onClose={() => setIsSimulatorOpen(false)} />
-      )}
 
       {/* Main Content Area */}
       <main className="flex-1 pb-16">

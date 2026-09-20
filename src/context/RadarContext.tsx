@@ -71,9 +71,9 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [simulatorConfig, setSimulatorConfig] = useState<SimulatorConfig>({
     athleteCount: 25,
     playbackSpeed: 1,
-    isRunning: true,
+    isRunning: false,
     noiseLevel: 'realistic',
-    injectSpontaneousAlerts: true
+    injectSpontaneousAlerts: false
   });
   const [userRole, setUserRole] = useState<'coach' | 'runner' | null>(null);
   const [currentRunnerId, setCurrentRunnerId] = useState<string | null>(null);
@@ -245,63 +245,6 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (channel) channel.unsubscribe();
     };
   }, [selectedGroupId]);
-
-  // Simulación en tiempo real en el cliente cuando el servidor Node no está conectado (ej. Vercel)
-  useEffect(() => {
-    if (isConnected || !simulatorConfig.isRunning) return;
-
-    const interval = setInterval(() => {
-      setAthletes((prevAthletes) => {
-        return prevAthletes.map((ath, idx) => {
-          // Si el atleta es el corredor actual activo, NO sobreescribir con datos mock simulados
-          if (currentRunnerId && ath.id === currentRunnerId) {
-            return ath;
-          }
-
-          const prevSample = ath.lastSample;
-          const currentAngle = (prevSample?.latitude ? Math.atan2(prevSample.latitude - (-34.5711), (prevSample.longitude || -58.4173) - (-58.4173)) : (idx / 18) * Math.PI * 2) + (0.015 * simulatorConfig.playbackSpeed);
-          
-          const newLat = -34.5711 + Math.sin(currentAngle) * 0.0045;
-          const newLng = -58.4173 + Math.cos(currentAngle) * 0.0060;
-          
-          const hrJitter = (Math.random() - 0.5) * 2;
-          const baseHr = ath.currentStatus === 'alert' ? 182 : 145 + ((idx * 3) % 20);
-          const newHr = Math.min(195, Math.max(110, Math.round((prevSample?.heartRate || baseHr) + hrJitter)));
-          
-          const updatedTrail = ath.trail ? [...ath.trail] : [];
-          updatedTrail.push([newLat, newLng]);
-          if (updatedTrail.length > 30) updatedTrail.shift();
-
-          const sample: MetricSample = {
-            athleteId: ath.id,
-            timestamp: Date.now(),
-            heartRate: newHr,
-            zone: (newHr > 175 ? 5 : (newHr > 155 ? 4 : (newHr > 135 ? 3 : 2))) as any,
-            pace: Math.round((ath.targetPaceMin || 330) + (Math.sin(Date.now() / 10000) * 15)),
-            speed: 10.5,
-            cadence: 165 + ((idx * 2) % 15),
-            distance: (prevSample?.distance || 4000) + Math.round(2.8 * simulatorConfig.playbackSpeed),
-            latitude: newLat,
-            longitude: newLng,
-            altitude: 25,
-            battery: prevSample?.battery ?? 85,
-            signalQuality: 'excellent',
-            source: 'phone',
-            sourceDevice: '📱 RunRadar App'
-          };
-
-          return {
-            ...ath,
-            lastSample: sample,
-            lastSeen: Date.now(),
-            trail: updatedTrail
-          };
-        });
-      });
-    }, 1000 / simulatorConfig.playbackSpeed);
-
-    return () => clearInterval(interval);
-  }, [isConnected, simulatorConfig.isRunning, simulatorConfig.playbackSpeed]);
 
   const currentRunner = currentRunnerId 
     ? (athletes.find(a => a.id === currentRunnerId) || null) 

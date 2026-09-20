@@ -1,14 +1,12 @@
 import React from 'react';
 import { useRadar } from '../../context/RadarContext';
-import { Activity, Bell, Radio, User, ShieldAlert, Sliders, Smartphone } from 'lucide-react';
+import { Activity, Bell, Radio, User, Smartphone } from 'lucide-react';
 
 interface HeaderProps {
   onOpenAlerts: () => void;
-  onOpenSimulator: () => void;
-  isSimulatorOpen: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenAlerts, onOpenSimulator, isSimulatorOpen }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenAlerts }) => {
   const { userRole, setUserRole, alerts, activeSession, isConnected } = useRadar();
   const unreadAlerts = alerts.filter(a => !a.acknowledged);
 
@@ -50,20 +48,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAlerts, onOpenSimulator, i
 
         {/* Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          
-          {/* Simulator Bar Toggle */}
-          <button
-            onClick={onOpenSimulator}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
-              isSimulatorOpen 
-                ? 'bg-cyan-500 text-black border-cyan-400 shadow-md shadow-cyan-500/20' 
-                : 'bg-radar-card text-slate-300 border-radar-border hover:border-slate-600'
-            }`}
-            title="Controles del Simulador Multi-Corredor"
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Simulador</span>
-          </button>
 
           {/* Role Indicator Badge */}
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-medium text-slate-300">

@@ -69,8 +69,8 @@ simulatorEngine.setTelemetryCallback((sample: MetricSample) => {
   }
 });
 
-// Iniciar simulador por defecto en modo demostración
-simulatorEngine.start();
+// Modo simulador demo desactivado por completo
+// simulatorEngine.start();
 
 server.listen(port, () => {
   console.log(`🚀 [RunRadar Server] Corriendo en http://localhost:${port}`);
