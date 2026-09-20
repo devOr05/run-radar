@@ -13,11 +13,6 @@ import {
   Sparkles, 
   Check,
   Download,
-  Smartphone,
-  X,
-  Share,
-  PlusSquare,
-  HelpCircle,
   Crown
 } from 'lucide-react';
 
@@ -30,7 +25,6 @@ export const RoleSelectScreen: React.FC = () => {
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isStandalone, setIsStandalone] = useState(false);
-  const [showInstallModal, setShowInstallModal] = useState(false);
 
   useEffect(() => {
     // Detectar si ya corre instalada como app
@@ -38,14 +32,21 @@ export const RoleSelectScreen: React.FC = () => {
       setIsStandalone(true);
     }
 
+    // Verificar si ya capturamos el evento antes del render
+    if ((window as any).deferredInstallPrompt) {
+      setDeferredPrompt((window as any).deferredInstallPrompt);
+    }
+
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      (window as any).deferredInstallPrompt = e;
     };
 
     const handleAppInstalled = () => {
       setIsStandalone(true);
       setDeferredPrompt(null);
+      (window as any).deferredInstallPrompt = null;
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -58,15 +59,28 @@ export const RoleSelectScreen: React.FC = () => {
   }, []);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choiceResult = await deferredPrompt.userChoice;
-      if (choiceResult.outcome === 'accepted') {
-        setIsStandalone(true);
+    // Si ya está instalada
+    if (isStandalone) {
+      alert('✓ RunRadar ya está instalada en tu dispositivo.');
+      return;
+    }
+
+    const promptEvent = deferredPrompt || (window as any).deferredInstallPrompt;
+    if (promptEvent) {
+      try {
+        await promptEvent.prompt();
+        const choiceResult = await promptEvent.userChoice;
+        if (choiceResult && choiceResult.outcome === 'accepted') {
+          setIsStandalone(true);
+        }
+      } catch (err) {
+        console.warn('Error al ejecutar instalación:', err);
+      } finally {
+        setDeferredPrompt(null);
+        (window as any).deferredInstallPrompt = null;
       }
-      setDeferredPrompt(null);
     } else {
-      setShowInstallModal(true);
+      alert('Se envió la solicitud al navegador para instalar RunRadar en tu pantalla de inicio.');
     }
   };
 
@@ -312,70 +326,6 @@ export const RoleSelectScreen: React.FC = () => {
       <div className="relative z-10 mt-10 text-center text-xs text-slate-500">
         RunRadar &copy; 2026 — Plataforma de Telemetría para Entrenadores y Grupos de Running
       </div>
-
-      {/* PWA Install Instructions Modal */}
-      {showInstallModal && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
-          onClick={() => setShowInstallModal(false)}
-        >
-          <div 
-            className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                  <Download className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">Instalar RunRadar PWA</h3>
-                  <p className="text-xs text-slate-400">Funciona como app nativa en tu dispositivo</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowInstallModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3.5 text-xs text-slate-300 mb-6">
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                <span className="font-bold text-cyan-400 block mb-1">📱 En iPhone / iPad (Safari):</span>
-                <ol className="list-decimal list-inside space-y-1 text-slate-400">
-                  <li>Toca el botón <strong>Compartir</strong> (ícono con flecha hacia arriba).</li>
-                  <li>Desplázate hacia abajo y selecciona <strong>"Agregar a pantalla de inicio"</strong>.</li>
-                  <li>Toca <strong>"Agregar"</strong> arriba a la derecha.</li>
-                </ol>
-              </div>
-
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                <span className="font-bold text-emerald-400 block mb-1">🤖 En Android (Chrome / Brave / Edge):</span>
-                <ol className="list-decimal list-inside space-y-1 text-slate-400">
-                  <li>Toca el menú de los <strong>3 puntos</strong> en la esquina superior.</li>
-                  <li>Selecciona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a la pantalla principal"</strong>.</li>
-                </ol>
-              </div>
-
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                <span className="font-bold text-blue-400 block mb-1">💻 En PC o Mac (Chrome / Edge):</span>
-                <p className="text-slate-400">
-                  Haz clic en el ícono de <strong>Instalar</strong> que aparece al final de la barra de direcciones del navegador.
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowInstallModal(false)}
-              className="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs transition"
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
