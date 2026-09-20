@@ -63,8 +63,9 @@ const spanishLastNames = [
   'Romero', 'Díaz', 'Alvarez', 'Torres', 'Ruiz', 'Ramírez', 'Flores', 'Acosta'
 ];
 
-const centerLat = -34.5711;
-const centerLng = -58.4173;
+// Coordenadas base de referencia: Mar del Plata (-38.0055, -57.5426)
+const centerLat = -38.0055;
+const centerLng = -57.5426;
 const radiusLat = 0.0045;
 const radiusLng = 0.0060;
 
