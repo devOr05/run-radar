@@ -2,8 +2,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { MetricSample, TrainingSession, Athlete } from '../types';
 
 const metaEnv = (import.meta as any).env || {};
-const supabaseUrl = metaEnv.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = metaEnv.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = metaEnv.VITE_SUPABASE_URL || 'https://oxfqrynciausdebcfqfk.supabase.co';
+const supabaseAnonKey = metaEnv.VITE_SUPABASE_ANON_KEY || 'sb_publishable_h0wJQnYPxb47JK_TusgXbQ_44KDFcoD';
 
 // Si las variables de entorno están presentes, inicializamos Supabase
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
