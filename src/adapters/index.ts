@@ -155,29 +155,24 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
 
     try {
       this.status = 'pending';
-      let device: any = null;
-
-      try {
-        device = await (navigator as any).bluetooth.requestDevice({
-          filters: [
-            { services: ['heart_rate'] }
-          ],
-          optionalServices: ['battery_service', 'heart_rate']
-        });
-      } catch (err: any) {
-        // Fallback: Si el Amazfit no anuncia el UUID de heart_rate en el paquete de advertisement inicial
-        if (err.name !== 'NotFoundError' || err.message?.includes('User cancelled')) {
-          throw err;
-        }
-        device = await (navigator as any).bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: ['heart_rate', 'battery_service']
-        });
-      }
+      // acceptAllDevices: true permite que Chrome liste el Amazfit Bip y cualquier reloj visible
+      const device = await (navigator as any).bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [
+          'heart_rate',
+          'battery_service',
+          0x180d,
+          0x180f
+        ]
+      });
 
       const server = await device.gatt.connect();
-      const service = await server.getPrimaryService('heart_rate');
-      this.characteristic = await service.getCharacteristic('heart_rate_measurement');
+      try {
+        const service = await server.getPrimaryService('heart_rate');
+        this.characteristic = await service.getCharacteristic('heart_rate_measurement');
+      } catch (svcErr) {
+        console.warn('El dispositivo se vinculó pero no expone servicio de frecuencia cardíaca estándar', svcErr);
+      }
       
       this.device = device;
       this.status = 'connected';

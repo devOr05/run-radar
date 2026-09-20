@@ -423,40 +423,56 @@ export const RunnerView: React.FC = () => {
       {step === 5 && (
         <div className="space-y-5 animate-fadeIn">
           
-          {/* Status Top Pill */}
-          <div className="bg-radar-card border border-radar-border rounded-2xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                <Radio className="w-5 h-5 animate-pulse" />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span className="text-xs font-extrabold uppercase text-emerald-400 tracking-wider">CONECTADO AL ENTRENADOR</span>
+          {/* Status Top Pill & Dedicated Full-Width Tabs */}
+          <div className="space-y-3">
+            <div className="bg-radar-card border border-radar-border rounded-2xl p-3.5 flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <Radio className="w-4 h-4 animate-pulse" />
                 </div>
-                <p className="text-xs text-slate-300 font-semibold mt-0.5">Profesor Juan • Running Martes</p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                    <span className="text-[11px] font-extrabold uppercase text-emerald-400 tracking-wider truncate">
+                      CONECTADO AL ENTRENADOR
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 font-semibold truncate">
+                    {coach?.name || 'Profesor Juan'} • {runnerGroup?.name || 'Running Martes'}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="flex bg-[#0B0F19] p-0.5 rounded-xl border border-radar-border text-xs">
+            {/* Navigation Tabs (3 columnas balanceadas para móviles) */}
+            <div className="grid grid-cols-3 bg-[#0B0F19] p-1 rounded-2xl border border-radar-border text-xs gap-1">
               <button
                 onClick={() => setActiveScreenTab('individual')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition ${activeScreenTab === 'individual' ? 'bg-cyan-500 text-black shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`py-2 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 ${
+                  activeScreenTab === 'individual' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
               >
-                Mi Estado
+                <Activity className="w-3.5 h-3.5 shrink-0" />
+                <span>Mi Estado</span>
               </button>
               <button
                 onClick={() => setActiveScreenTab('collective')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 ${activeScreenTab === 'collective' ? 'bg-cyan-500 text-black shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`py-2 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 ${
+                  activeScreenTab === 'collective' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
               >
+                <Users className="w-3.5 h-3.5 shrink-0" />
                 <span>Pelotón</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               </button>
               <button
                 onClick={() => setActiveScreenTab('permissions')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition ${activeScreenTab === 'permissions' ? 'bg-cyan-500 text-black shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`py-2 px-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 ${
+                  activeScreenTab === 'permissions' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
               >
-                Permisos
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                <span>Permisos</span>
               </button>
             </div>
           </div>
@@ -513,21 +529,21 @@ export const RunnerView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Botón de Conexión Bluetooth de Banda Cardíaca */}
+              {/* Botón de Conexión Bluetooth de Banda / Reloj */}
               <div className="p-4 rounded-2xl bg-radar-card border border-radar-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
                     <Bluetooth className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-white block">Vincular Banda Bluetooth</span>
-                    <span className="text-[10px] text-slate-400">Polar H10, Garmin HRM, Magene, Wahoo</span>
+                    <span className="text-xs font-bold text-white block">Vincular Reloj / Sensor Cardíaco</span>
+                    <span className="text-[10px] text-slate-400">Amazfit, Garmin, Polar, Magene, Smartwatches</span>
                   </div>
                 </div>
                 <button
                   onClick={handleConnectBluetooth}
                   disabled={isBluetoothConnecting}
-                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition"
+                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition shrink-0"
                 >
                   {isBluetoothConnecting ? 'Buscando...' : bluetoothStatus === 'connected' ? '✓ Conectado' : 'Conectar'}
                 </button>
