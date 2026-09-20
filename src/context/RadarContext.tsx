@@ -73,7 +73,7 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     injectSpontaneousAlerts: true
   });
   const [userRole, setUserRole] = useState<'coach' | 'runner' | null>(null);
-  const [currentRunnerId, setCurrentRunnerId] = useState<string | null>('athlete-1');
+  const [currentRunnerId, setCurrentRunnerId] = useState<string | null>(null);
 
   // 1. Detección de invitaciones por WhatsApp/QR (?join=...) y Auto-Login persistente del celular
   useEffect(() => {
@@ -250,6 +250,11 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const interval = setInterval(() => {
       setAthletes((prevAthletes) => {
         return prevAthletes.map((ath, idx) => {
+          // Si el atleta es el corredor actual activo, NO sobreescribir con datos mock simulados
+          if (currentRunnerId && ath.id === currentRunnerId) {
+            return ath;
+          }
+
           const prevSample = ath.lastSample;
           const currentAngle = (prevSample?.latitude ? Math.atan2(prevSample.latitude - (-34.5711), (prevSample.longitude || -58.4173) - (-58.4173)) : (idx / 18) * Math.PI * 2) + (0.015 * simulatorConfig.playbackSpeed);
           
@@ -295,7 +300,9 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => clearInterval(interval);
   }, [isConnected, simulatorConfig.isRunning, simulatorConfig.playbackSpeed]);
 
-  const currentRunner = athletes.find(a => a.id === currentRunnerId) || athletes[0] || null;
+  const currentRunner = currentRunnerId 
+    ? (athletes.find(a => a.id === currentRunnerId) || null) 
+    : (userRole === 'runner' ? null : (athletes[0] || null));
 
   const startSession = async (data: { name: string; groupId: string; targetDistanceKm: number; targetDurationMinutes: number }) => {
     const newSession: TrainingSession = {
@@ -545,7 +552,11 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const prev = ath.lastSample;
         const lat = partialSample.latitude ?? prev?.latitude;
         const lng = partialSample.longitude ?? prev?.longitude;
-        const hr = partialSample.heartRate ?? prev?.heartRate ?? 145;
+        const hr = partialSample.heartRate !== undefined ? partialSample.heartRate : prev?.heartRate;
+        const pace = partialSample.pace !== undefined ? partialSample.pace : prev?.pace;
+        const speed = partialSample.speed !== undefined ? partialSample.speed : (prev?.speed ?? 0);
+        const distance = partialSample.distance !== undefined ? partialSample.distance : (prev?.distance ?? 0);
+        const battery = partialSample.battery !== undefined ? partialSample.battery : prev?.battery;
 
         const updatedTrail = ath.trail ? [...ath.trail] : [];
         if (lat && lng) {
@@ -557,18 +568,18 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           athleteId: ath.id,
           timestamp: Date.now(),
           heartRate: hr,
-          zone: (hr > 175 ? 5 : (hr > 155 ? 4 : (hr > 135 ? 3 : 2))) as any,
-          pace: partialSample.pace ?? prev?.pace ?? 330,
-          speed: partialSample.speed ?? prev?.speed ?? 10.0,
-          cadence: partialSample.cadence ?? prev?.cadence ?? 160,
-          distance: partialSample.distance ?? prev?.distance ?? 0,
+          zone: hr ? ((hr > 175 ? 5 : (hr > 155 ? 4 : (hr > 135 ? 3 : 2))) as any) : undefined,
+          pace: pace,
+          speed: speed,
+          cadence: partialSample.cadence !== undefined ? partialSample.cadence : prev?.cadence,
+          distance: distance,
           latitude: lat,
           longitude: lng,
-          altitude: partialSample.altitude ?? prev?.altitude ?? 20,
-          battery: partialSample.battery ?? prev?.battery ?? 90,
-          signalQuality: 'excellent',
+          altitude: partialSample.altitude !== undefined ? partialSample.altitude : prev?.altitude,
+          battery: battery,
+          signalQuality: (partialSample.signalQuality || prev?.signalQuality || 'excellent') as any,
           source: partialSample.source ?? prev?.source ?? 'phone',
-          sourceDevice: partialSample.sourceDevice ?? prev?.sourceDevice ?? '📱 Celular GPS'
+          sourceDevice: partialSample.sourceDevice ?? prev?.sourceDevice ?? '📱 GPS Celular'
         };
 
         if (isSupabaseConfigured && selectedGroupId) {

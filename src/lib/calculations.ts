@@ -54,9 +54,9 @@ export function speedToPace(kmh?: number): number {
  * Formatea distancia en metros a km legibles (ej: 5.8 km)
  */
 export function formatDistance(meters?: number): string {
-  if (meters === undefined || meters === null || isNaN(meters)) return '0.0 km';
+  if (meters === undefined || meters === null || isNaN(meters)) return '0.00 km';
   const km = meters / 1000;
-  return `${km.toFixed(1)} km`;
+  return `${km.toFixed(2)} km`;
 }
 
 /**

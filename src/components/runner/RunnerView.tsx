@@ -32,11 +32,37 @@ export const RunnerView: React.FC = () => {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(currentRunner ? 5 : 1);
 
   // Formulario de Registro
-  const [name, setName] = useState('Juan');
-  const [lastName, setLastName] = useState('Pérez');
-  const [email, setEmail] = useState('juan.perez@ejemplo.com');
-  const [phone, setPhone] = useState('+54 9 11 4567-8901');
+  const [name, setName] = useState(currentRunner?.name || '');
+  const [lastName, setLastName] = useState(currentRunner?.lastName || '');
+  const [email, setEmail] = useState(currentRunner?.email || '');
+  const [phone, setPhone] = useState(currentRunner?.phone || '');
   const [inviteCode, setInviteCode] = useState('RUN-4821');
+
+  // Cronómetro real de la sesión (inicia en 00:00 al entrar al entrenamiento)
+  const [sessionSeconds, setSessionSeconds] = useState(0);
+
+  useEffect(() => {
+    if (step === 5) {
+      const timer = setInterval(() => {
+        setSessionSeconds((prev) => prev + 1);
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [step]);
+
+  // Nivel de batería real del dispositivo (navigator.getBattery)
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
+      (navigator as any).getBattery().then((battery: any) => {
+        setBatteryLevel(Math.round(battery.level * 100));
+        const update = () => setBatteryLevel(Math.round(battery.level * 100));
+        battery.addEventListener('levelchange', update);
+        return () => battery.removeEventListener('levelchange', update);
+      }).catch(() => {});
+    }
+  }, []);
 
   // Permisos granulares
   const [permissions, setPermissions] = useState<AthletePermissions>({
@@ -63,7 +89,10 @@ export const RunnerView: React.FC = () => {
         if (ok) {
           phoneAdapter.startStream((sample) => {
             if (emitRunnerSample) {
-              emitRunnerSample(sample);
+              emitRunnerSample({
+                ...sample,
+                battery: batteryLevel ?? sample.battery
+              });
             }
           });
         }
@@ -73,7 +102,7 @@ export const RunnerView: React.FC = () => {
         phoneAdapter.stopStream();
       };
     }
-  }, [step, emitRunnerSample]);
+  }, [step, emitRunnerSample, batteryLevel]);
 
   const handleJoin = async () => {
     const res = await joinRunner({
@@ -116,9 +145,10 @@ export const RunnerView: React.FC = () => {
   };
 
   const sample = currentRunner?.lastSample;
-  const hr = sample?.heartRate || 148;
-  const hrZone = calculateHeartRateZone(hr, currentRunner?.maxHeartRate || 185);
-  const zoneInfo = getZoneDetails(hrZone);
+  // Solo valores biométricos REALES (si no hay sensor conectado o no hay lectura, es null)
+  const hr = sample?.heartRate ?? null;
+  const hrZone = hr ? calculateHeartRateZone(hr, currentRunner?.maxHeartRate || 185) : null;
+  const zoneInfo = hrZone ? getZoneDetails(hrZone) : null;
 
   // Cálculos de Estado Colectivo del Grupo
   const runnerGroup = groups.find(g => currentRunner?.groupIds?.includes(g.id)) || groups[0];
@@ -143,7 +173,7 @@ export const RunnerView: React.FC = () => {
 
   const avgDistance = useMemo(() => {
     const withDist = groupAthletes.filter(a => a.lastSample?.distance);
-    if (withDist.length === 0) return 5000;
+    if (withDist.length === 0) return 0;
     const sum = withDist.reduce((acc, a) => acc + (a.lastSample?.distance || 0), 0);
     return Math.round(sum / withDist.length);
   }, [groupAthletes]);
@@ -152,8 +182,8 @@ export const RunnerView: React.FC = () => {
   const groupAttentionCount = groupAthletes.filter(a => a.currentStatus === 'attention').length;
   const groupAlertCount = groupAthletes.filter(a => a.currentStatus === 'alert').length;
 
-  const currentPace = sample?.pace || 345;
-  const paceDiff = currentPace - avgPace;
+  const currentPace = sample?.pace ?? null;
+  const paceDiff = currentPace !== null ? currentPace - avgPace : null;
 
   return (
     <div className="max-w-xl mx-auto px-4 py-6 sm:py-10">
@@ -220,6 +250,7 @@ export const RunnerView: React.FC = () => {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  placeholder="Tu nombre"
                   className="w-full bg-[#0B0F19] border border-radar-border rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-cyan-400"
                 />
               </div>
@@ -231,6 +262,7 @@ export const RunnerView: React.FC = () => {
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Tu apellido"
                   className="w-full bg-[#0B0F19] border border-radar-border rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-cyan-400"
                 />
               </div>
@@ -244,6 +276,7 @@ export const RunnerView: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu.email@ejemplo.com"
                 className="w-full bg-[#0B0F19] border border-radar-border rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-cyan-400"
               />
             </div>
@@ -256,6 +289,7 @@ export const RunnerView: React.FC = () => {
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                placeholder="+54 9 11 ..."
                 className="w-full bg-[#0B0F19] border border-radar-border rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-cyan-400"
               />
             </div>
@@ -486,34 +520,46 @@ export const RunnerView: React.FC = () => {
                 {/* FC Hero */}
                 <div className="mb-6">
                   <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">
-                    <Heart className="w-4 h-4 text-rose-500 animate-pulse" /> Mi Frecuencia Cardíaca
+                    <Heart className={`w-4 h-4 text-rose-500 ${hr !== null ? 'animate-pulse' : 'opacity-40'}`} /> Mi Frecuencia Cardíaca
                   </div>
                   <div className="flex items-baseline justify-center gap-2">
                     <span className="text-6xl sm:text-7xl font-black text-white font-['JetBrains_Mono',monospace] tracking-tight">
-                      {hr}
+                      {hr !== null ? hr : '--'}
                     </span>
                     <span className="text-lg font-bold text-slate-400">BPM</span>
                   </div>
-                  <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-extrabold uppercase tracking-wide bg-rose-500/10 text-rose-300 border-rose-500/30">
-                    <span>{zoneInfo.label}</span>
-                    <span>•</span>
-                    <span>{zoneInfo.name}</span>
-                  </div>
+                  {zoneInfo ? (
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-extrabold uppercase tracking-wide bg-rose-500/10 text-rose-300 border-rose-500/30">
+                      <span>{zoneInfo.label}</span>
+                      <span>•</span>
+                      <span>{zoneInfo.name}</span>
+                    </div>
+                  ) : (
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-medium text-slate-400 border-slate-700/60 bg-slate-900/60">
+                      <span>{bluetoothStatus === 'connected' ? '⌚ Amazfit vinculado • Esperando lectura de pulso...' : 'Sensor no conectado (Vincular abajo)'}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Sub Métricas Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-[#0B0F19] p-4 rounded-2xl border border-radar-border text-left">
                   <div>
                     <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Mi Ritmo</span>
-                    <span className="text-xl font-extrabold text-white font-mono">{formatPace(currentPace)}</span>
+                    <span className="text-xl font-extrabold text-white font-mono">
+                      {currentPace ? formatPace(currentPace) : '--:--'}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Distancia</span>
-                    <span className="text-xl font-extrabold text-white font-mono">{formatDistance(sample?.distance || 5800)}</span>
+                    <span className="text-xl font-extrabold text-white font-mono">
+                      {formatDistance(sample?.distance || 0)}
+                    </span>
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Tiempo</span>
-                    <span className="text-xl font-extrabold text-cyan-400 font-mono">{formatDuration(2280)}</span>
+                    <span className="text-xl font-extrabold text-cyan-400 font-mono">
+                      {formatDuration(sessionSeconds)}
+                    </span>
                   </div>
                 </div>
 
@@ -521,10 +567,10 @@ export const RunnerView: React.FC = () => {
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 pt-4 border-t border-radar-border/40">
                   <div className="flex items-center gap-1.5">
                     <Smartphone className="w-4 h-4 text-cyan-400" />
-                    <span>{sample?.sourceDevice || '📱 Sensor del Celular'}</span>
+                    <span>{sample?.sourceDevice || (bluetoothStatus === 'connected' ? '⌚ Reloj Conectado' : '📱 Sensor GPS del Celular')}</span>
                   </div>
                   <div className="flex items-center gap-1 text-emerald-400 font-medium">
-                    <Zap className="w-3.5 h-3.5" /> Batería: 85%
+                    <Zap className="w-3.5 h-3.5" /> {batteryLevel !== null ? `Batería: ${batteryLevel}%` : (sample?.battery ? `Batería: ${sample.battery}%` : '📱 GPS Activo')}
                   </div>
                 </div>
               </div>
@@ -574,7 +620,7 @@ export const RunnerView: React.FC = () => {
                       Tu Ritmo
                     </span>
                     <span className="text-2xl font-black text-cyan-400 font-mono">
-                      {formatPace(currentPace)}
+                      {currentPace ? formatPace(currentPace) : '--:--'}
                     </span>
                     <span className="text-[10px] text-slate-500 block mt-1">
                       min/km actual
@@ -601,10 +647,13 @@ export const RunnerView: React.FC = () => {
                     Posición en el grupo:
                   </span>
                   <span className={`font-bold ${
+                    paceDiff === null ? 'text-slate-400' :
                     paceDiff < -10 ? 'text-cyan-400' :
                     paceDiff > 10 ? 'text-amber-400' : 'text-emerald-400'
                   }`}>
-                    {paceDiff < -10 
+                    {paceDiff === null
+                      ? '🏃 Esperando movimiento GPS...'
+                      : paceDiff < -10 
                       ? `🚀 Tirando del grupo (${Math.abs(paceDiff)}s más rápido)` 
                       : paceDiff > 10 
                       ? `🟡 En cola del pelotón (+${paceDiff}s)` 
@@ -658,8 +707,8 @@ export const RunnerView: React.FC = () => {
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                   {groupAthletes.map((ath) => {
                     const isMe = ath.id === currentRunner?.id;
-                    const athPace = ath.lastSample?.pace || 340;
-                    const athHR = ath.lastSample?.heartRate || 145;
+                    const athPace = isMe ? ath.lastSample?.pace : (ath.lastSample?.pace || 340);
+                    const athHR = isMe ? ath.lastSample?.heartRate : (ath.lastSample?.heartRate || 145);
 
                     return (
                       <div
@@ -680,7 +729,9 @@ export const RunnerView: React.FC = () => {
                               {ath.name} {ath.lastName} {isMe && '(Tú)'}
                             </span>
                             <span className="text-[10px] text-slate-400">
-                              {ath.devices[0]?.name || 'Sensor'}
+                              {isMe 
+                                ? (ath.lastSample?.sourceDevice || (bluetoothStatus === 'connected' ? '⌚ Reloj Conectado' : '📱 GPS Celular')) 
+                                : (ath.devices[0]?.name || 'Sensor')}
                             </span>
                           </div>
                         </div>
@@ -689,13 +740,13 @@ export const RunnerView: React.FC = () => {
                           <div>
                             <span className="text-[10px] text-slate-400 block">Ritmo</span>
                             <span className="text-xs font-bold font-mono text-white">
-                              {formatPace(athPace)}
+                              {athPace ? formatPace(athPace) : '--:--'}
                             </span>
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-400 block">FC</span>
                             <span className="text-xs font-bold font-mono text-rose-400">
-                              {athHR} BPM
+                              {athHR ? `${athHR} BPM` : '-- BPM'}
                             </span>
                           </div>
                         </div>
