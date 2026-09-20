@@ -25,7 +25,8 @@ import {
   QrCode,
   Hash,
   LogOut,
-  Pencil
+  Pencil,
+  RefreshCw
 } from 'lucide-react';
 import { formatPace, formatDistance, formatDuration, calculateHeartRateZone, getZoneDetails } from '../../lib/calculations';
 import { QRScannerModal } from './QRScannerModal';
@@ -98,7 +99,8 @@ export const RunnerView: React.FC = () => {
   });
 
   const [isBluetoothConnecting, setIsBluetoothConnecting] = useState(false);
-  const [bluetoothStatus, setBluetoothStatus] = useState<'idle' | 'connected' | 'unsupported'>('idle');
+  const [isScanningHr, setIsScanningHr] = useState(false);
+  const [bluetoothStatus, setBluetoothStatus] = useState<'idle' | 'connected' | 'reconnecting' | 'unsupported'>('idle');
   const [activeScreenTab, setActiveScreenTab] = useState<'individual' | 'collective' | 'permissions'>('individual');
 
   // Conectar adaptador local de Sensores del Celular (GPS + acelerómetro)
@@ -191,15 +193,26 @@ export const RunnerView: React.FC = () => {
               setBleDeviceInfo(updatedInfo);
               localStorage.setItem('runradar_paired_watch', JSON.stringify(updatedInfo));
             }
+            bleAdapter.onInfoUpdated((info) => {
+              setBleDeviceInfo({ ...info });
+            });
             bleAdapter.onDisconnect(() => {
-              setBluetoothStatus('idle');
+              if (bleAdapter.status === 'pending') {
+                setBluetoothStatus('reconnecting');
+              } else {
+                setBluetoothStatus('idle');
+              }
             });
             bleAdapter.startStream((sample) => {
               if (emitRunnerSample) {
                 emitRunnerSample({
                   ...sample,
-                  sourceDevice: `⌚ ${updatedInfo?.name || parsed.name || 'Reloj Deportivo'}`
+                  sourceDevice: `⌚ ${bleAdapter.getDeviceInfo()?.name || parsed.name || 'Reloj Deportivo'}`
                 });
+              }
+              const current = bleAdapter.getDeviceInfo();
+              if (current) {
+                setBleDeviceInfo({ ...current });
               }
             });
           }
@@ -212,6 +225,11 @@ export const RunnerView: React.FC = () => {
 
   const handleConnectBluetooth = async () => {
     setIsBluetoothConnecting(true);
+    if (bleAdapterInstance) {
+      try {
+        await bleAdapterInstance.disconnect();
+      } catch (e) {}
+    }
     const bleAdapter = new BluetoothHeartRateAdapter();
     const ok = await bleAdapter.connect();
     setIsBluetoothConnecting(false);
@@ -228,9 +246,16 @@ export const RunnerView: React.FC = () => {
         }
       } catch (e) {}
 
+      bleAdapter.onInfoUpdated((updated) => {
+        setBleDeviceInfo({ ...updated });
+      });
+
       bleAdapter.onDisconnect(() => {
-        setBluetoothStatus('idle');
-        // No borramos bleDeviceInfo para mantenerlo vinculado en la UI
+        if (bleAdapter.status === 'pending') {
+          setBluetoothStatus('reconnecting');
+        } else {
+          setBluetoothStatus('idle');
+        }
       });
 
       bleAdapter.startStream((sample) => {
@@ -240,9 +265,32 @@ export const RunnerView: React.FC = () => {
             sourceDevice: `⌚ ${info?.name || 'Reloj Deportivo'}`
           });
         }
+        const current = bleAdapter.getDeviceInfo();
+        if (current) {
+          setBleDeviceInfo({ ...current });
+        }
       });
     } else {
       setBluetoothStatus('unsupported');
+    }
+  };
+
+  const handleForceScanHr = async () => {
+    if (!bleAdapterInstance) return;
+    setIsScanningHr(true);
+    try {
+      const found = await bleAdapterInstance.forceScanHeartRate();
+      const updated = bleAdapterInstance.getDeviceInfo();
+      if (updated) {
+        setBleDeviceInfo({ ...updated });
+      }
+      if (found) {
+        setBluetoothStatus('connected');
+      }
+    } catch (e) {
+      console.warn('Error al forzar escaneo de canal FC:', e);
+    } finally {
+      setIsScanningHr(false);
     }
   };
 
@@ -821,7 +869,13 @@ export const RunnerView: React.FC = () => {
                     </div>
                   ) : (
                     <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-medium text-slate-400 border-slate-700/60 bg-slate-900/60">
-                      <span>{bluetoothStatus === 'connected' ? `⌚ ${bleDeviceInfo?.name || 'Amazfit'} vinculado • ${hr ? 'Transmitiendo pulso' : 'Esperando lectura...'}` : 'Sensor no conectado (Vincular reloj abajo)'}</span>
+                      <span>
+                        {bluetoothStatus === 'connected' 
+                          ? `⌚ ${bleDeviceInfo?.name || 'Amazfit'} vinculado • ${hr ? 'Transmitiendo pulso en vivo' : (bleDeviceInfo?.hasHeartRate ? 'Esperando lectura del sensor...' : 'Buscando canal 0x180D en reloj...')}` 
+                          : (bluetoothStatus === 'reconnecting' 
+                              ? '🔄 Reconectando reloj automáticamente...' 
+                              : 'Sensor no conectado (Vincular reloj abajo)')}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -878,27 +932,39 @@ export const RunnerView: React.FC = () => {
                 <div className={`p-4 rounded-2xl border-2 shadow-xl space-y-3 animate-fadeIn overflow-hidden ${
                   bluetoothStatus === 'connected' 
                     ? 'bg-gradient-to-r from-emerald-950/40 to-slate-900 border-emerald-500/50' 
-                    : 'bg-slate-900/90 border-cyan-500/40'
+                    : (bluetoothStatus === 'reconnecting'
+                        ? 'bg-gradient-to-r from-amber-950/40 to-slate-900 border-amber-500/50'
+                        : 'bg-slate-900/90 border-cyan-500/40')
                 }`}>
                   {/* Fila 1: Info del Smartwatch */}
                   <div className="flex items-center gap-3">
                     <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
                       bluetoothStatus === 'connected' 
                         ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
-                        : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                        : (bluetoothStatus === 'reconnecting'
+                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                            : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30')
                     }`}>
-                      <Watch className={`w-6 h-6 ${bluetoothStatus === 'connected' ? 'animate-pulse' : ''}`} />
+                      <Watch className={`w-6 h-6 ${bluetoothStatus === 'connected' ? 'animate-pulse' : (bluetoothStatus === 'reconnecting' ? 'animate-spin' : '')}`} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`w-2 h-2 rounded-full shrink-0 ${
-                          bluetoothStatus === 'connected' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'
+                          bluetoothStatus === 'connected' 
+                            ? 'bg-emerald-400 animate-ping' 
+                            : (bluetoothStatus === 'reconnecting' ? 'bg-amber-400 animate-pulse' : 'bg-slate-400')
                         }`} />
                         <h4 className="text-sm font-black text-white tracking-wide truncate">
                           {bleDeviceInfo.name}
                         </h4>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
-                          {bluetoothStatus === 'connected' ? 'EN VIVO' : 'VINCULADO'}
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                          bluetoothStatus === 'connected'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : (bluetoothStatus === 'reconnecting'
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                : 'bg-slate-800 text-slate-300 border-slate-700')
+                        }`}>
+                          {bluetoothStatus === 'connected' ? 'EN VIVO' : (bluetoothStatus === 'reconnecting' ? 'RECONECTANDO' : 'VINCULADO')}
                         </span>
                       </div>
                       <div className="text-xs text-slate-300 font-semibold mt-0.5 truncate">
@@ -908,7 +974,7 @@ export const RunnerView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Fila 2: Botones de Acción Móviles (Reconectar / Desvincular) */}
+                  {/* Fila 2: Botones de Acción Móviles */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     {bluetoothStatus !== 'connected' ? (
                       <button
@@ -920,10 +986,22 @@ export const RunnerView: React.FC = () => {
                         <span>{isBluetoothConnecting ? 'Buscando...' : 'Reconectar'}</span>
                       </button>
                     ) : (
-                      <div className="py-2.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                        <span>Transmitiendo</span>
-                      </div>
+                      hr === null ? (
+                        <button
+                          onClick={handleForceScanHr}
+                          disabled={isScanningHr}
+                          className="py-2.5 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          title="Forzar re-escaneo del canal de pulso 0x180D"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isScanningHr ? 'animate-spin' : ''}`} />
+                          <span>{isScanningHr ? 'Escaneando...' : 'Buscar Canal FC'}</span>
+                        </button>
+                      ) : (
+                        <div className="py-2.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                          <span>Transmitiendo {bleDeviceInfo.packetsReceived ? `(${bleDeviceInfo.packetsReceived})` : ''}</span>
+                        </div>
+                      )
                     )}
                     <button
                       onClick={handleDisconnectBluetooth}
@@ -946,8 +1024,8 @@ export const RunnerView: React.FC = () => {
                                 ? `${hr} BPM en vivo` 
                                 : (bleDeviceInfo.hasHeartRate 
                                     ? 'Esperando lectura...' 
-                                    : 'Zepp HR no activo')) 
-                            : 'En reposo (Reconectar)'}
+                                    : 'Buscando canal 0x180D...')) 
+                            : (bluetoothStatus === 'reconnecting' ? 'Reconectando...' : 'En reposo (Reconectar)')}
                         </span>
                       </div>
                     </div>
@@ -962,21 +1040,32 @@ export const RunnerView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Guía Amazfit si no hay lectura de pulso */}
+                  {/* Guía Específica Amazfit / Zepp si no hay lectura de pulso */}
                   {hr === null && (
-                    <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/40 text-[11px] text-cyan-200 flex items-start gap-2.5">
-                      <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                      <div className="space-y-1 leading-snug">
-                        <span className="font-bold text-cyan-300 block">¿Tu Amazfit no transmite el pulso al navegador?</span>
-                        <p className="text-slate-300">
-                          En Amazfit, la transmisión Bluetooth estándar viene apagada de fábrica. Actívala así:
-                          <br />
-                          1. Abre la app <b>Zepp</b> en tu móvil &gt; Pestaña <b>Perfil</b>.
-                          <br />
-                          2. Toca en <b>{bleDeviceInfo.name || 'Amazfit Bip 6'}</b>.
-                          <br />
-                          3. Ingresa a <b>Monitoreo de salud</b> &gt; Activa <b>"Compartir frecuencia cardíaca con dispositivos"</b>.
-                        </p>
+                    <div className="p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-700/50 text-[11px] text-cyan-200 space-y-2">
+                      <div className="flex items-center gap-2 text-cyan-300 font-bold">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>¿Por qué tu Amazfit aún no envía los latidos?</span>
+                      </div>
+                      <p className="text-slate-300 leading-relaxed">
+                        Los relojes Amazfit con Zepp OS <b>no transmiten el pulso por Bluetooth en la pantalla normal</b> de la hora para no agotar la batería en 1 día. Para que abra el canal <b>0x180D</b>:
+                      </p>
+                      <div className="bg-slate-950/70 p-2.5 rounded-lg border border-cyan-900/60 space-y-1.5 text-slate-300 text-[11px]">
+                        <div>
+                          <b className="text-cyan-300">1. En tu teléfono (Zepp):</b>
+                          <span className="block text-slate-300">Perfil &gt; {bleDeviceInfo.name || 'Amazfit Bip 6'} &gt; Monitoreo de salud &gt; Activar <b>"Compartir frecuencia cardíaca con dispositivos"</b>.</span>
+                        </div>
+                        <div className="pt-1 border-t border-slate-800">
+                          <b className="text-amber-300">2. EN LA PANTALLA DEL RELOJ (¡Paso clave!):</b>
+                          <span className="block text-slate-300">
+                            En el menú de aplicaciones de tu reloj, abre la app <b>"Transmisión de frecuencia cardíaca"</b> (icono de corazón con ondas).
+                            <br />
+                            <i>O bien:</i> inicia una actividad de <b>"Correr"</b> o <b>"Caminar"</b> en el reloj.
+                          </span>
+                        </div>
+                        <div className="pt-1 border-t border-slate-800 text-[10px] text-slate-400">
+                          💡 Tan pronto como abras la app en el reloj o comiences el entreno, el sistema detecta el canal automáticamente y el botón superior cambiará a verde "Transmitiendo".
+                        </div>
                       </div>
                     </div>
                   )}
