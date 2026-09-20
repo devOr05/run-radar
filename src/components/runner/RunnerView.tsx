@@ -24,7 +24,8 @@ import {
   Compass,
   QrCode,
   Hash,
-  LogOut
+  LogOut,
+  Pencil
 } from 'lucide-react';
 import { formatPace, formatDistance, formatDuration, calculateHeartRateZone, getZoneDetails } from '../../lib/calculations';
 import { QRScannerModal } from './QRScannerModal';
@@ -645,32 +646,35 @@ export const RunnerView: React.FC = () => {
           
           {/* Status Top Pill & Dedicated Full-Width Tabs */}
           <div className="space-y-3">
-            {/* Cabecera de Identidad del Corredor */}
-            <div className="bg-radar-card border border-radar-border rounded-2xl p-3.5 flex items-center justify-between shadow-lg">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-blue-600/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-extrabold text-sm shrink-0">
-                  {currentRunner ? `${(currentRunner.name?.[0] || 'C').toUpperCase()}${(currentRunner.lastName?.[0] || 'R').toUpperCase()}` : '🏃'}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-black text-white truncate">
-                      {currentRunner ? `${currentRunner.name} ${currentRunner.lastName}` : 'Mi Perfil de Corredor'}
-                    </span>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                      ACTIVO
-                    </span>
+            {/* Cabecera de Identidad del Corredor (Diseño limpio y no sobrecargado) */}
+            <div className="bg-radar-card border border-radar-border rounded-2xl p-3 flex items-center justify-between shadow-lg">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {/* Avatar con punto de conexión en vivo integrado */}
+                <div className="relative shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-blue-600/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-extrabold text-sm shadow-inner">
+                    {currentRunner ? `${(currentRunner.name?.[0] || 'C').toUpperCase()}${(currentRunner.lastName?.[0] || 'R').toUpperCase()}` : '🏃'}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400 truncate">
-                    <span>{currentRunner?.email || 'Sin email'}</span>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0B0F19] ring-1 ring-emerald-500/50 animate-pulse" />
+                </div>
+
+                {/* Nombre y detalles de contacto con espacio completo */}
+                <div className="min-w-0 flex-1 pr-2">
+                  <h3 className="text-sm font-black text-white truncate tracking-wide">
+                    {currentRunner ? `${currentRunner.name} ${currentRunner.lastName}`.trim() : 'Mi Perfil de Corredor'}
+                  </h3>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400 truncate mt-0.5">
+                    <span className="truncate">{currentRunner?.email || 'Sin email'}</span>
                     {currentRunner?.phone && (
                       <>
-                        <span>•</span>
-                        <span className="text-cyan-400 font-mono font-medium">📱 {currentRunner.phone}</span>
+                        <span className="text-slate-600">•</span>
+                        <span className="text-cyan-400 font-mono shrink-0">{currentRunner.phone}</span>
                       </>
                     )}
                   </div>
                 </div>
               </div>
+
+              {/* Botón sutil de edición */}
               <button
                 onClick={() => {
                   setEditName(currentRunner?.name || '');
@@ -679,9 +683,11 @@ export const RunnerView: React.FC = () => {
                   setEditPhone(currentRunner?.phone || '');
                   setShowEditProfileModal(true);
                 }}
-                className="px-2.5 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-800/50 text-[11px] font-bold transition shrink-0"
+                className="px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-cyan-400 border border-slate-700/80 text-xs font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer shadow-sm"
+                title="Editar mis datos personales"
               >
-                Editar Mis Datos
+                <Pencil className="w-3 h-3 text-cyan-400" />
+                <span>Editar</span>
               </button>
             </div>
 
