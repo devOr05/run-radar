@@ -102,7 +102,8 @@ export class PhoneSensorAdapter implements DeviceAdapter {
           this.lastPosition = pos;
         }
 
-        const pace = speed > 1.2 ? Math.round(3600 / speed) : undefined;
+        // Solo computar ritmo de carrera si la velocidad supera 3.0 km/h (evita ritmos absurdos en reposo)
+        const pace = (speed >= 3.0 && speed <= 35.0) ? Math.round(3600 / speed) : undefined;
 
         this.onSampleCallback?.({
           source: 'phone',

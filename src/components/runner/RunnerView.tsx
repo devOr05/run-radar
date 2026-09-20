@@ -869,74 +869,83 @@ export const RunnerView: React.FC = () => {
 
               {/* Tarjeta de Reloj Vinculado (Conectado o Reconectando/En reposo) */}
               {bleDeviceInfo ? (
-                <div className={`p-4 rounded-2xl border-2 shadow-xl space-y-3 animate-fadeIn ${
+                <div className={`p-4 rounded-2xl border-2 shadow-xl space-y-3 animate-fadeIn overflow-hidden ${
                   bluetoothStatus === 'connected' 
                     ? 'bg-gradient-to-r from-emerald-950/40 to-slate-900 border-emerald-500/50' 
                     : 'bg-slate-900/90 border-cyan-500/40'
                 }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
-                        bluetoothStatus === 'connected' 
-                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
-                          : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                      }`}>
-                        <Watch className={`w-6 h-6 ${bluetoothStatus === 'connected' ? 'animate-pulse' : ''}`} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full ${
-                            bluetoothStatus === 'connected' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'
-                          }`} />
-                          <h4 className="text-sm font-black text-white tracking-wide">
-                            {bleDeviceInfo.name}
-                          </h4>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                            {bluetoothStatus === 'connected' ? 'EN VIVO' : 'VINCULADO'}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-300 font-semibold mt-0.5">
-                          Marca: {bleDeviceInfo.manufacturer}
-                          {bleDeviceInfo.model && bleDeviceInfo.model !== bleDeviceInfo.name ? ` • Modelo: ${bleDeviceInfo.model}` : ''}
-                        </div>
-                      </div>
+                  {/* Fila 1: Info del Smartwatch */}
+                  <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
+                      bluetoothStatus === 'connected' 
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                    }`}>
+                      <Watch className={`w-6 h-6 ${bluetoothStatus === 'connected' ? 'animate-pulse' : ''}`} />
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {bluetoothStatus !== 'connected' && (
-                        <button
-                          onClick={handleConnectBluetooth}
-                          disabled={isBluetoothConnecting}
-                          className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black transition shrink-0"
-                        >
-                          {isBluetoothConnecting ? 'Conectando...' : 'Reconectar'}
-                        </button>
-                      )}
-                      <button
-                        onClick={handleDisconnectBluetooth}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/50 hover:border-rose-500/50 hover:text-rose-300 text-slate-300 border border-slate-700 text-xs font-bold transition shrink-0"
-                      >
-                        Desvincular
-                      </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${
+                          bluetoothStatus === 'connected' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'
+                        }`} />
+                        <h4 className="text-sm font-black text-white tracking-wide truncate">
+                          {bleDeviceInfo.name}
+                        </h4>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                          {bluetoothStatus === 'connected' ? 'EN VIVO' : 'VINCULADO'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-300 font-semibold mt-0.5 truncate">
+                        Marca: {bleDeviceInfo.manufacturer}
+                        {bleDeviceInfo.model && bleDeviceInfo.model !== bleDeviceInfo.name ? ` • Modelo: ${bleDeviceInfo.model}` : ''}
+                      </div>
                     </div>
                   </div>
 
+                  {/* Fila 2: Botones de Acción Móviles (Reconectar / Desvincular) */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    {bluetoothStatus !== 'connected' ? (
+                      <button
+                        onClick={handleConnectBluetooth}
+                        disabled={isBluetoothConnecting}
+                        className="py-2.5 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black transition flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20 cursor-pointer disabled:opacity-50"
+                      >
+                        <Bluetooth className="w-3.5 h-3.5" />
+                        <span>{isBluetoothConnecting ? 'Buscando...' : 'Reconectar'}</span>
+                      </button>
+                    ) : (
+                      <div className="py-2.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span>Transmitiendo</span>
+                      </div>
+                    )}
+                    <button
+                      onClick={handleDisconnectBluetooth}
+                      className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-rose-950/50 hover:border-rose-500/50 hover:text-rose-300 text-slate-300 border border-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Desvincular</span>
+                    </button>
+                  </div>
+
+                  {/* Fila 3: Métricas de Sensor y Batería */}
                   <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-700/50">
-                    <div className="bg-[#0B0F19] p-2.5 rounded-xl flex items-center gap-2 border border-radar-border">
+                    <div className="bg-[#0B0F19] p-2.5 rounded-xl flex items-center gap-2 border border-radar-border min-w-0">
                       <Heart className="w-4 h-4 text-rose-500 shrink-0" />
-                      <div>
+                      <div className="min-w-0 truncate">
                         <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Sensor Cardíaco</span>
-                        <span className="text-xs font-bold text-white">
+                        <span className="text-xs font-bold text-white truncate block">
                           {bluetoothStatus === 'connected' 
                             ? (hr !== null ? `${hr} BPM en vivo` : 'Esperando lectura...') 
                             : 'En reposo'}
                         </span>
                       </div>
                     </div>
-                    <div className="bg-[#0B0F19] p-2.5 rounded-xl flex items-center gap-2 border border-radar-border">
+                    <div className="bg-[#0B0F19] p-2.5 rounded-xl flex items-center gap-2 border border-radar-border min-w-0">
                       <Zap className="w-4 h-4 text-amber-400 shrink-0" />
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Batería del Reloj</span>
-                        <span className="text-xs font-bold text-emerald-400 font-mono">
+                      <div className="min-w-0 truncate">
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Batería Reloj</span>
+                        <span className="text-xs font-bold text-emerald-400 font-mono truncate block">
                           {bleDeviceInfo.batteryLevel !== undefined ? `${bleDeviceInfo.batteryLevel}%` : (bluetoothStatus === 'connected' ? 'OK' : 'Guardado')}
                         </span>
                       </div>
@@ -963,7 +972,7 @@ export const RunnerView: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="p-4 rounded-2xl bg-radar-card border border-radar-border flex items-center justify-between">
+                <div className="p-4 rounded-2xl bg-radar-card border border-radar-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
                       <Bluetooth className="w-5 h-5" />
@@ -976,7 +985,7 @@ export const RunnerView: React.FC = () => {
                   <button
                     onClick={handleConnectBluetooth}
                     disabled={isBluetoothConnecting}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold text-xs transition shrink-0 shadow-lg shadow-blue-500/20 flex items-center gap-1.5"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold text-xs transition shrink-0 shadow-lg shadow-blue-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Bluetooth className="w-3.5 h-3.5" />
                     {isBluetoothConnecting ? 'Buscando...' : 'Vincular Reloj'}

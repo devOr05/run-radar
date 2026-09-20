@@ -36,7 +36,7 @@ export function getZoneDetails(zone: 1 | 2 | 3 | 4 | 5): { label: string; name: 
  * Formatea ritmo en segundos/km a formato "MM:SS/km"
  */
 export function formatPace(secondsPerKm?: number): string {
-  if (!secondsPerKm || secondsPerKm <= 0 || !isFinite(secondsPerKm)) return '--:--/km';
+  if (!secondsPerKm || secondsPerKm <= 0 || !isFinite(secondsPerKm) || secondsPerKm > 1080) return '--:--/km';
   const minutes = Math.floor(secondsPerKm / 60);
   const seconds = Math.floor(secondsPerKm % 60);
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}/km`;
