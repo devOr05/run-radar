@@ -20,8 +20,11 @@ import {
 } from 'lucide-react';
 
 export const RoleSelectScreen: React.FC = () => {
-  const { setUserRole, athletes, groups, setCurrentRunnerId, isConnected } = useRadar();
+  const { setUserRole, athletes, groups, setCurrentRunnerId, isConnected, joinRunner } = useRadar();
   const [selectedAthleteOption, setSelectedAthleteOption] = useState<string>(athletes[0]?.id || 'athlete-1');
+  const [runnerMode, setRunnerMode] = useState<'custom' | 'demo'>('custom');
+  const [customRunnerName, setCustomRunnerName] = useState('');
+  const [customRunnerLastName, setCustomRunnerLastName] = useState('');
   const [runnerCode, setRunnerCode] = useState('RUN-4821');
 
   // PWA Install State
@@ -71,8 +74,33 @@ export const RoleSelectScreen: React.FC = () => {
     setUserRole('coach');
   };
 
-  const handleRunnerLogin = () => {
-    setCurrentRunnerId(selectedAthleteOption);
+  const handleRunnerLogin = async () => {
+    if (runnerMode === 'custom' && customRunnerName.trim()) {
+      const res = await joinRunner({
+        name: customRunnerName.trim(),
+        lastName: customRunnerLastName.trim() || 'Corredor',
+        email: `${customRunnerName.toLowerCase().replace(/\s+/g, '')}@runradar.app`,
+        inviteCode: runnerCode.trim().toUpperCase(),
+        permissions: {
+          heartRate: true,
+          location: true,
+          workouts: true,
+          steps: true,
+          cadence: true,
+          elevation: true,
+          calories: true,
+          wearables: true,
+          updatedAt: Date.now()
+        }
+      });
+      if (res.success && res.athlete) {
+        setCurrentRunnerId(res.athlete.id);
+      }
+    } else if (runnerMode === 'demo') {
+      setCurrentRunnerId(selectedAthleteOption);
+    } else {
+      setCurrentRunnerId(null);
+    }
     setUserRole('runner');
   };
 
@@ -185,34 +213,96 @@ export const RoleSelectScreen: React.FC = () => {
               Sigue tu propio rendimiento biométrico en tiempo real y compáralo con el estado colectivo del pelotón.
             </p>
 
-            {/* Quick Profile / Code Selector */}
-            <div className="bg-slate-950/80 rounded-xl p-3.5 border border-slate-800 mb-6 space-y-3">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-400 block mb-1">
-                  Atleta demo para probar:
-                </label>
-                <select
-                  value={selectedAthleteOption}
-                  onChange={(e) => setSelectedAthleteOption(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+            {/* Profile Input & Group Code */}
+            <div className="bg-slate-950/90 rounded-2xl p-4 border border-slate-800 mb-6 space-y-3.5">
+              
+              {/* Mode Toggle: Mi Nombre vs Atleta Demo */}
+              <div className="flex rounded-xl bg-slate-900 p-1 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setRunnerMode('custom')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    runnerMode === 'custom'
+                      ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
                 >
-                  {athletes.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} {a.lastName} ({a.devices[0]?.name || 'Sensor'})
-                    </option>
-                  ))}
-                </select>
+                  <span>✍️ Con Mi Nombre</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRunnerMode('demo')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    runnerMode === 'demo'
+                      ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span>⚡ Probar Demo</span>
+                </button>
               </div>
 
+              {runnerMode === 'custom' ? (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                      Tu Nombre:
+                    </label>
+                    <input
+                      type="text"
+                      value={customRunnerName}
+                      onChange={(e) => setCustomRunnerName(e.target.value)}
+                      placeholder="Ej: Laura"
+                      className="w-full bg-slate-900 border border-slate-750 focus:border-emerald-400 rounded-xl px-3 py-2 text-xs text-white focus:outline-none placeholder-slate-500 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                      Tu Apellido:
+                    </label>
+                    <input
+                      type="text"
+                      value={customRunnerLastName}
+                      onChange={(e) => setCustomRunnerLastName(e.target.value)}
+                      placeholder="Ej: Gómez"
+                      className="w-full bg-slate-900 border border-slate-750 focus:border-emerald-400 rounded-xl px-3 py-2 text-xs text-white focus:outline-none placeholder-slate-500 transition"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                    Atleta de prueba:
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedAthleteOption}
+                      onChange={(e) => setSelectedAthleteOption(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 hover:border-emerald-500/50 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 appearance-none pr-8 cursor-pointer"
+                    >
+                      {athletes.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          🏃 {a.name} {a.lastName} ({a.devices[0]?.name || 'Sensor'})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">
+                      ▼
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="text-[11px] font-semibold text-slate-400 block mb-1">
-                  Código de Grupo:
+                <label className="text-[11px] font-semibold text-slate-300 block mb-1 flex items-center justify-between">
+                  <span>Código de Grupo:</span>
+                  <span className="text-[10px] text-emerald-400 font-mono">De tu entrenador</span>
                 </label>
                 <input
                   type="text"
                   value={runnerCode}
-                  onChange={(e) => setRunnerCode(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 font-mono"
+                  onChange={(e) => setRunnerCode(e.target.value.toUpperCase())}
+                  className="w-full bg-slate-900 border border-slate-750 focus:border-emerald-400 rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono font-bold tracking-wider focus:outline-none uppercase"
                   placeholder="Ej: RUN-4821"
                 />
               </div>
