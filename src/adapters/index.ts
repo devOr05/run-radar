@@ -120,8 +120,17 @@ export class PhoneSensorAdapter implements DeviceAdapter {
   }
 }
 
+export interface BluetoothDeviceInfo {
+  name: string;
+  id: string;
+  manufacturer?: string;
+  model?: string;
+  batteryLevel?: number;
+  hasHeartRate: boolean;
+}
+
 /**
- * Adaptador Web Bluetooth para Sensores Cardíacos Estándar (Polar H10, Garmin HRM, Magene, Wahoo)
+ * Adaptador Web Bluetooth para Sensores Cardíacos Estándar (Polar H10, Garmin HRM, Amazfit, Magene, Wahoo)
  */
 export class BluetoothHeartRateAdapter implements DeviceAdapter {
   id = 'bluetooth-hrm';
@@ -146,6 +155,21 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
   private device: any = null;
   private characteristic: any = null;
   private onSampleCallback: ((sample: Partial<MetricSample>) => void) | null = null;
+  private deviceInfo: BluetoothDeviceInfo | null = null;
+  private watchBattery: number | null = null;
+  private onDisconnectCallback: (() => void) | null = null;
+
+  getDeviceInfo(): BluetoothDeviceInfo | null {
+    return this.deviceInfo;
+  }
+
+  getBatteryLevel(): number | null {
+    return this.watchBattery;
+  }
+
+  onDisconnect(cb: () => void): void {
+    this.onDisconnectCallback = cb;
+  }
 
   async connect(): Promise<boolean> {
     if (!(navigator as any).bluetooth) {
@@ -161,20 +185,95 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
         optionalServices: [
           'heart_rate',
           'battery_service',
+          'device_information',
           0x180d,
-          0x180f
+          0x180f,
+          0x180a
         ]
       });
 
       const server = await device.gatt.connect();
+
+      // Escuchar desconexión física o fuera de alcance
+      device.addEventListener('gattserverdisconnected', () => {
+        this.status = 'disconnected';
+        this.onDisconnectCallback?.();
+      });
+
+      let hasHeartRate = false;
       try {
         const service = await server.getPrimaryService('heart_rate');
         this.characteristic = await service.getCharacteristic('heart_rate_measurement');
+        hasHeartRate = true;
       } catch (svcErr) {
         console.warn('El dispositivo se vinculó pero no expone servicio de frecuencia cardíaca estándar', svcErr);
       }
-      
+
+      // Intentar leer nivel de batería del reloj vía BLE (0x180F)
+      let readBat: number | undefined = undefined;
+      try {
+        const batService = await server.getPrimaryService('battery_service');
+        const batChar = await batService.getCharacteristic('battery_level');
+        const batVal = await batChar.readValue();
+        readBat = batVal.getUint8(0);
+        this.watchBattery = readBat ?? null;
+      } catch (batErr) {
+        console.log('Servicio de batería no expuesto por el reloj');
+      }
+
+      // Intentar leer fabricante y modelo estándar (0x180A)
+      let manufacturer = '';
+      let model = '';
+      try {
+        const infoService = await server.getPrimaryService('device_information');
+        try {
+          const mfgChar = await infoService.getCharacteristic('manufacturer_name_string');
+          const mfgVal = await mfgChar.readValue();
+          manufacturer = new TextDecoder().decode(mfgVal).replace(/\0/g, '').trim();
+        } catch (e) {}
+        try {
+          const modChar = await infoService.getCharacteristic('model_number_string');
+          const modVal = await modChar.readValue();
+          model = new TextDecoder().decode(modVal).replace(/\0/g, '').trim();
+        } catch (e) {}
+      } catch (infoErr) {}
+
+      // Deducir marca inteligente si el firmware no expone fabricante en GATT
+      const devName = device.name || 'Dispositivo Bluetooth';
+      const lowerName = devName.toLowerCase();
+      if (!manufacturer) {
+        if (lowerName.includes('amazfit') || lowerName.includes('bip') || lowerName.includes('gtr') || lowerName.includes('gts')) {
+          manufacturer = 'Amazfit / Zepp Health';
+        } else if (lowerName.includes('garmin') || lowerName.includes('forerunner')) {
+          manufacturer = 'Garmin';
+        } else if (lowerName.includes('polar')) {
+          manufacturer = 'Polar';
+        } else if (lowerName.includes('mi band') || lowerName.includes('xiaomi') || lowerName.includes('smart band')) {
+          manufacturer = 'Xiaomi';
+        } else if (lowerName.includes('huawei')) {
+          manufacturer = 'Huawei';
+        } else if (lowerName.includes('samsung') || lowerName.includes('galaxy')) {
+          manufacturer = 'Samsung';
+        } else if (lowerName.includes('coros')) {
+          manufacturer = 'COROS';
+        } else if (lowerName.includes('magene')) {
+          manufacturer = 'Magene';
+        } else if (lowerName.includes('wahoo')) {
+          manufacturer = 'Wahoo';
+        } else {
+          manufacturer = 'Smartwatch / Sensor BLE';
+        }
+      }
+
       this.device = device;
+      this.deviceInfo = {
+        name: devName,
+        id: device.id,
+        manufacturer,
+        model: model || devName,
+        batteryLevel: readBat,
+        hasHeartRate
+      };
       this.status = 'connected';
       return true;
     } catch (e) {
@@ -185,10 +284,12 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
   }
 
   async disconnect(): Promise<void> {
-    if (this.device && this.device.gatt.connected) {
+    if (this.device && this.device.gatt?.connected) {
       this.device.gatt.disconnect();
     }
     this.status = 'disconnected';
+    this.deviceInfo = null;
+    this.watchBattery = null;
   }
 
   startStream(onSample: (sample: Partial<MetricSample>) => void): void {
@@ -209,9 +310,10 @@ export class BluetoothHeartRateAdapter implements DeviceAdapter {
 
         this.onSampleCallback?.({
           source: 'chest_strap',
-          sourceDevice: this.device?.name || 'Sensor Cardíaco BLE',
+          sourceDevice: `⌚ ${this.deviceInfo?.name || this.device?.name || 'Reloj Bluetooth'}`,
           timestamp: Date.now(),
-          heartRate: hr
+          heartRate: hr,
+          battery: this.watchBattery ?? undefined
         });
       });
     });

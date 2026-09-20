@@ -50,6 +50,7 @@ interface RadarContextType {
   createGroup: (data: { name: string; schedule?: string; description?: string; inviteCode?: string; targetDistance?: number; targetPaceRange?: [number, number] }) => Promise<Group>;
   emitRunnerSample: (sample: Partial<MetricSample>) => void;
   updateRunnerPermissions: (athleteId: string, permissions: Partial<AthletePermissions>) => Promise<void>;
+  updateRunnerProfile: (data: { name: string; lastName: string; email?: string; phone?: string }) => Promise<void>;
   exportCSV: (sessionId?: string) => void;
 }
 
@@ -610,6 +611,46 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {}
   };
 
+  const updateRunnerProfile = async (data: { name: string; lastName: string; email?: string; phone?: string }) => {
+    if (!currentRunnerId) return;
+
+    setAthletes((prev) =>
+      prev.map((a) => {
+        if (a.id !== currentRunnerId) return a;
+        const updated = {
+          ...a,
+          name: data.name.trim() || a.name,
+          lastName: data.lastName.trim() || a.lastName,
+          email: data.email?.trim() || a.email,
+          phone: data.phone?.trim() || a.phone
+        };
+
+        if (isSupabaseConfigured && supabase) {
+          supabase
+            .from('athletes')
+            .upsert({
+              id: updated.id,
+              name: updated.name,
+              last_name: updated.lastName,
+              email: updated.email
+            })
+            .then(() => {}, (err) => console.warn('Supabase athlete profile update err', err));
+        }
+
+        try {
+          const saved = localStorage.getItem('runradar_session');
+          const parsed = saved ? JSON.parse(saved) : {};
+          localStorage.setItem('runradar_session', JSON.stringify({
+            ...parsed,
+            athleteName: `${updated.name} ${updated.lastName}`
+          }));
+        } catch (e) {}
+
+        return updated;
+      })
+    );
+  };
+
   const exportCSV = (sessionId?: string) => {
     const id = sessionId || activeSession?.id || 'current';
     window.open(`/api/sessions/${id}/export-csv`, '_blank');
@@ -646,6 +687,7 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         createGroup,
         emitRunnerSample,
         updateRunnerPermissions,
+        updateRunnerProfile,
         exportCSV,
       }}
     >

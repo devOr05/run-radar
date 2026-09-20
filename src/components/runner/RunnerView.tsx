@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRadar } from '../../context/RadarContext';
 import { AthletePermissions, MetricSample } from '../../types';
-import { PhoneSensorAdapter, BluetoothHeartRateAdapter } from '../../adapters';
+import { PhoneSensorAdapter, BluetoothHeartRateAdapter, BluetoothDeviceInfo } from '../../adapters';
 import { LiveMapView } from '../coach/LiveMapView';
 import { 
   Heart, 
@@ -26,7 +26,7 @@ import {
 import { formatPace, formatDistance, formatDuration, calculateHeartRateZone, getZoneDetails } from '../../lib/calculations';
 
 export const RunnerView: React.FC = () => {
-  const { currentRunner, joinRunner, updateRunnerPermissions, groups, athletes, coach, emitRunnerSample } = useRadar();
+  const { currentRunner, joinRunner, updateRunnerPermissions, updateRunnerProfile, groups, athletes, coach, emitRunnerSample } = useRadar();
 
   // Pasos de Onboarding: 1. Intro, 2. Datos, 3. Entrenador, 4. Permisos, 5. Mi Entrenamiento (Listo)
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(currentRunner ? 5 : 1);
@@ -37,6 +37,16 @@ export const RunnerView: React.FC = () => {
   const [email, setEmail] = useState(currentRunner?.email || '');
   const [phone, setPhone] = useState(currentRunner?.phone || '');
   const [inviteCode, setInviteCode] = useState('RUN-4821');
+
+  // Modal para editar perfil
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editName, setEditName] = useState(currentRunner?.name || '');
+  const [editLastName, setEditLastName] = useState(currentRunner?.lastName || '');
+  const [editEmail, setEditEmail] = useState(currentRunner?.email || '');
+
+  // Información del reloj / sensor Bluetooth conectado
+  const [bleDeviceInfo, setBleDeviceInfo] = useState<BluetoothDeviceInfo | null>(null);
+  const [bleAdapterInstance, setBleAdapterInstance] = useState<BluetoothHeartRateAdapter | null>(null);
 
   // Cronómetro real de la sesión (inicia en 00:00 al entrar al entrenamiento)
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -127,21 +137,62 @@ export const RunnerView: React.FC = () => {
     }
   };
 
+  // Sincronizar campos de edición al cargar/cambiar el corredor
+  useEffect(() => {
+    if (currentRunner) {
+      setEditName(currentRunner.name || '');
+      setEditLastName(currentRunner.lastName || '');
+      setEditEmail(currentRunner.email || '');
+    }
+  }, [currentRunner]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editName.trim()) return;
+    await updateRunnerProfile({
+      name: editName.trim(),
+      lastName: editLastName.trim(),
+      email: editEmail.trim()
+    });
+    setShowEditProfileModal(false);
+  };
+
   const handleConnectBluetooth = async () => {
     setIsBluetoothConnecting(true);
     const bleAdapter = new BluetoothHeartRateAdapter();
     const ok = await bleAdapter.connect();
     setIsBluetoothConnecting(false);
     if (ok) {
+      const info = bleAdapter.getDeviceInfo();
+      setBleDeviceInfo(info);
+      setBleAdapterInstance(bleAdapter);
       setBluetoothStatus('connected');
+
+      bleAdapter.onDisconnect(() => {
+        setBluetoothStatus('idle');
+        setBleDeviceInfo(null);
+      });
+
       bleAdapter.startStream((sample) => {
         if (emitRunnerSample) {
-          emitRunnerSample(sample);
+          emitRunnerSample({
+            ...sample,
+            sourceDevice: `⌚ ${info?.name || 'Reloj Deportivo'}`
+          });
         }
       });
     } else {
       setBluetoothStatus('unsupported');
     }
+  };
+
+  const handleDisconnectBluetooth = async () => {
+    if (bleAdapterInstance) {
+      await bleAdapterInstance.disconnect();
+    }
+    setBleAdapterInstance(null);
+    setBleDeviceInfo(null);
+    setBluetoothStatus('idle');
   };
 
   const sample = currentRunner?.lastSample;
@@ -459,23 +510,37 @@ export const RunnerView: React.FC = () => {
           
           {/* Status Top Pill & Dedicated Full-Width Tabs */}
           <div className="space-y-3">
-            <div className="bg-radar-card border border-radar-border rounded-2xl p-3.5 flex items-center justify-between">
+            {/* Cabecera de Identidad del Corredor y Estado de Grupo */}
+            <div className="bg-radar-card border border-radar-border rounded-2xl p-3.5 flex items-center justify-between shadow-lg">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                  <Radio className="w-4 h-4 animate-pulse" />
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-blue-600/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-extrabold text-sm shrink-0">
+                  {currentRunner ? `${(currentRunner.name?.[0] || 'C').toUpperCase()}${(currentRunner.lastName?.[0] || 'R').toUpperCase()}` : '🏃'}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                    <span className="text-[11px] font-extrabold uppercase text-emerald-400 tracking-wider truncate">
-                      CONECTADO AL ENTRENADOR
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-white truncate">
+                      {currentRunner ? `${currentRunner.name} ${currentRunner.lastName}` : 'Mi Perfil de Corredor'}
+                    </span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold">
+                      ACTIVO
                     </span>
                   </div>
-                  <p className="text-xs text-slate-300 font-semibold truncate">
-                    {coach?.name || 'Profesor Juan'} • {runnerGroup?.name || 'Running Martes'}
+                  <p className="text-[11px] text-slate-400 truncate">
+                    {runnerGroup?.name || 'Pelotón de Running'} • {coach?.name || 'Profesor Juan'}
                   </p>
                 </div>
               </div>
+              <button
+                onClick={() => {
+                  setEditName(currentRunner?.name || '');
+                  setEditLastName(currentRunner?.lastName || '');
+                  setEditEmail(currentRunner?.email || '');
+                  setShowEditProfileModal(true);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-800/50 text-[11px] font-bold transition shrink-0"
+              >
+                Editar Mis Datos
+              </button>
             </div>
 
             {/* Navigation Tabs (3 columnas balanceadas para móviles) */}
@@ -536,7 +601,7 @@ export const RunnerView: React.FC = () => {
                     </div>
                   ) : (
                     <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-medium text-slate-400 border-slate-700/60 bg-slate-900/60">
-                      <span>{bluetoothStatus === 'connected' ? '⌚ Amazfit vinculado • Esperando lectura de pulso...' : 'Sensor no conectado (Vincular abajo)'}</span>
+                      <span>{bluetoothStatus === 'connected' ? `⌚ ${bleDeviceInfo?.name || 'Amazfit'} vinculado • ${hr ? 'Transmitiendo pulso' : 'Esperando lectura...'}` : 'Sensor no conectado (Vincular reloj abajo)'}</span>
                     </div>
                   )}
                 </div>
@@ -563,37 +628,102 @@ export const RunnerView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Footer Dispositivo y Conexión */}
+                {/* Footer Dispositivo y Baterías Detalladas */}
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 pt-4 border-t border-radar-border/40">
-                  <div className="flex items-center gap-1.5">
-                    <Smartphone className="w-4 h-4 text-cyan-400" />
-                    <span>{sample?.sourceDevice || (bluetoothStatus === 'connected' ? '⌚ Reloj Conectado' : '📱 Sensor GPS del Celular')}</span>
+                  <div className="flex items-center gap-1.5 truncate max-w-[60%]">
+                    <Smartphone className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span className="truncate">
+                      {bluetoothStatus === 'connected' 
+                        ? `⌚ ${bleDeviceInfo?.name || 'Reloj'} + 📱 GPS Celular` 
+                        : '📱 Sensor GPS del Celular'}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1 text-emerald-400 font-medium">
-                    <Zap className="w-3.5 h-3.5" /> {batteryLevel !== null ? `Batería: ${batteryLevel}%` : (sample?.battery ? `Batería: ${sample.battery}%` : '📱 GPS Activo')}
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-1 text-emerald-400 font-medium">
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Celular: {batteryLevel !== null ? `${batteryLevel}%` : 'Activo'}</span>
+                    </div>
+                    {bleDeviceInfo?.batteryLevel !== undefined && (
+                      <div className="flex items-center gap-1 text-cyan-400 font-medium">
+                        <Watch className="w-3.5 h-3.5" />
+                        <span>Reloj: {bleDeviceInfo.batteryLevel}%</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Botón de Conexión Bluetooth de Banda / Reloj */}
-              <div className="p-4 rounded-2xl bg-radar-card border border-radar-border flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-                    <Bluetooth className="w-5 h-5" />
+              {/* Tarjeta de Reloj Vinculado o Botón de Conectar */}
+              {bluetoothStatus === 'connected' && bleDeviceInfo ? (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 to-slate-900 border-2 border-emerald-500/50 shadow-xl space-y-3 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                        <Watch className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                          <h4 className="text-sm font-black text-white tracking-wide">
+                            {bleDeviceInfo.name}
+                          </h4>
+                        </div>
+                        <div className="text-xs text-emerald-400 font-semibold mt-0.5">
+                          Marca: {bleDeviceInfo.manufacturer}
+                          {bleDeviceInfo.model && bleDeviceInfo.model !== bleDeviceInfo.name ? ` • Modelo: ${bleDeviceInfo.model}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDisconnectBluetooth}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/50 hover:border-rose-500/50 hover:text-rose-300 text-slate-300 border border-slate-700 text-xs font-bold transition shrink-0"
+                    >
+                      Desvincular
+                    </button>
                   </div>
-                  <div>
-                    <span className="text-xs font-bold text-white block">Vincular Reloj / Sensor Cardíaco</span>
-                    <span className="text-[10px] text-slate-400">Amazfit, Garmin, Polar, Magene, Smartwatches</span>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-emerald-500/20">
+                    <div className="bg-[#0B0F19] p-2.5 rounded-xl flex items-center gap-2 border border-radar-border">
+                      <Heart className="w-4 h-4 text-rose-500 shrink-0" />
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Sensor Cardíaco</span>
+                        <span className="text-xs font-bold text-white">
+                          {bleDeviceInfo.hasHeartRate ? '✓ BLE HR Transmitiendo' : 'Buscando lectura...'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="bg-[#0B0F19] p-2.5 rounded-xl flex items-center gap-2 border border-radar-border">
+                      <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Batería del Reloj</span>
+                        <span className="text-xs font-bold text-emerald-400 font-mono">
+                          {bleDeviceInfo.batteryLevel !== undefined ? `${bleDeviceInfo.batteryLevel}%` : 'Conectado'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={handleConnectBluetooth}
-                  disabled={isBluetoothConnecting}
-                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition shrink-0"
-                >
-                  {isBluetoothConnecting ? 'Buscando...' : bluetoothStatus === 'connected' ? '✓ Conectado' : 'Conectar'}
-                </button>
-              </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-radar-card border border-radar-border flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                      <Bluetooth className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-white block">Vincular Reloj / Sensor Cardíaco</span>
+                      <span className="text-[10px] text-slate-400">Amazfit, Garmin, Polar, Magene, Smartwatches</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleConnectBluetooth}
+                    disabled={isBluetoothConnecting}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold text-xs transition shrink-0 shadow-lg shadow-blue-500/20 flex items-center gap-1.5"
+                  >
+                    <Bluetooth className="w-3.5 h-3.5" />
+                    {isBluetoothConnecting ? 'Buscando...' : 'Vincular Reloj'}
+                  </button>
+                </div>
+              )}
             </>
           )}
 
@@ -799,6 +929,78 @@ export const RunnerView: React.FC = () => {
             </div>
           )}
 
+        </div>
+      )}
+
+      {/* Modal para Editar Perfil del Corredor */}
+      {showEditProfileModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-radar-card border border-radar-border rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-radar-border pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <span>🏃</span> Mis Datos de Corredor
+              </h3>
+              <button
+                onClick={() => setShowEditProfileModal(false)}
+                className="text-slate-400 hover:text-white text-sm font-bold w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-3.5 text-xs">
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Tu Nombre:</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-[#0B0F19] border border-radar-border rounded-xl px-3.5 py-2.5 text-white text-sm focus:border-cyan-400 outline-none"
+                  placeholder="Ej: Kevin"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Tu Apellido:</label>
+                <input
+                  type="text"
+                  value={editLastName}
+                  onChange={(e) => setEditLastName(e.target.value)}
+                  className="w-full bg-[#0B0F19] border border-radar-border rounded-xl px-3.5 py-2.5 text-white text-sm focus:border-cyan-400 outline-none"
+                  placeholder="Ej: Gómez"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Email:</label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full bg-[#0B0F19] border border-radar-border rounded-xl px-3.5 py-2.5 text-white text-sm focus:border-cyan-400 outline-none"
+                  placeholder="tu.email@ejemplo.com"
+                />
+              </div>
+
+              <div className="pt-3 flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowEditProfileModal(false)}
+                  className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 font-bold transition hover:bg-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-extrabold transition shadow-lg shadow-cyan-500/20 hover:opacity-95"
+                >
+                  Guardar Datos
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
