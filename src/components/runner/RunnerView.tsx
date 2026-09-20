@@ -21,12 +21,16 @@ import {
   Users,
   TrendingUp,
   Gauge,
-  Compass
+  Compass,
+  QrCode,
+  Hash,
+  LogOut
 } from 'lucide-react';
 import { formatPace, formatDistance, formatDuration, calculateHeartRateZone, getZoneDetails } from '../../lib/calculations';
+import { QRScannerModal } from './QRScannerModal';
 
 export const RunnerView: React.FC = () => {
-  const { currentRunner, joinRunner, updateRunnerPermissions, updateRunnerProfile, groups, athletes, coach, emitRunnerSample } = useRadar();
+  const { currentRunner, joinRunner, updateRunnerPermissions, updateRunnerProfile, joinGroup, leaveGroup, groups, athletes, coach, emitRunnerSample } = useRadar();
 
   // Pasos de Onboarding: 1. Intro, 2. Datos, 3. Entrenador, 4. Permisos, 5. Mi Entrenamiento (Listo)
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(currentRunner ? 5 : 1);
@@ -36,7 +40,11 @@ export const RunnerView: React.FC = () => {
   const [lastName, setLastName] = useState(currentRunner?.lastName || '');
   const [email, setEmail] = useState(currentRunner?.email || '');
   const [phone, setPhone] = useState(currentRunner?.phone || '');
-  const [inviteCode, setInviteCode] = useState('RUN-4821');
+  const [inviteCode, setInviteCode] = useState('');
+
+  // Modal para escanear QR o ingresar código de entrenador
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinModalInitialTab, setJoinModalInitialTab] = useState<'qr' | 'code'>('qr');
 
   // Modal para editar perfil
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -202,22 +210,23 @@ export const RunnerView: React.FC = () => {
   const zoneInfo = hrZone ? getZoneDetails(hrZone) : null;
 
   // Cálculos de Estado Colectivo del Grupo
-  const runnerGroup = groups.find(g => currentRunner?.groupIds?.includes(g.id)) || groups[0];
+  const runnerGroup = groups.find(g => currentRunner?.groupIds?.includes(g.id)) || null;
+  const isCoachConnected = !!runnerGroup;
   const groupAthletes = useMemo(() => {
-    if (!runnerGroup) return athletes;
+    if (!runnerGroup) return currentRunner ? [currentRunner] : [];
     return athletes.filter(a => a.groupIds.includes(runnerGroup.id));
-  }, [athletes, runnerGroup]);
+  }, [athletes, runnerGroup, currentRunner]);
 
   const avgHeartRate = useMemo(() => {
     const withHR = groupAthletes.filter(a => a.lastSample?.heartRate);
-    if (withHR.length === 0) return 145;
+    if (withHR.length === 0) return 0;
     const sum = withHR.reduce((acc, a) => acc + (a.lastSample?.heartRate || 0), 0);
     return Math.round(sum / withHR.length);
   }, [groupAthletes]);
 
   const avgPace = useMemo(() => {
     const withPace = groupAthletes.filter(a => a.lastSample?.pace);
-    if (withPace.length === 0) return 330;
+    if (withPace.length === 0) return 0;
     const sum = withPace.reduce((acc, a) => acc + (a.lastSample?.pace || 0), 0);
     return Math.round(sum / withPace.length);
   }, [groupAthletes]);
@@ -234,7 +243,7 @@ export const RunnerView: React.FC = () => {
   const groupAlertCount = groupAthletes.filter(a => a.currentStatus === 'alert').length;
 
   const currentPace = sample?.pace ?? null;
-  const paceDiff = currentPace !== null ? currentPace - avgPace : null;
+  const paceDiff = (currentPace !== null && avgPace > 0) ? currentPace - avgPace : null;
 
   return (
     <div className="max-w-xl mx-auto px-4 py-6 sm:py-10">
@@ -356,54 +365,97 @@ export const RunnerView: React.FC = () => {
       )}
 
       {/* ================= PASO 3: QUIÉN ES TU ENTRENADOR ================= */}
-      {step === 3 && (
-        <div className="bg-radar-card border border-radar-border rounded-3xl p-6 sm:p-8 shadow-2xl animate-fadeIn">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
-              2
+      {step === 3 && (() => {
+        const matchedOnboardingGroup = inviteCode.trim() 
+          ? groups.find(g => g.inviteCode?.toUpperCase() === inviteCode.trim().toUpperCase()) 
+          : null;
+
+        return (
+          <div className="bg-radar-card border border-radar-border rounded-3xl p-6 sm:p-8 shadow-2xl animate-fadeIn">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+                2
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">¿Quién es tu Entrenador?</h2>
+                <p className="text-xs text-slate-400">Escanea el QR o ingresa el código de tu grupo</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">¿Quién es tu Entrenador?</h2>
-              <p className="text-xs text-slate-400">Ingresa el código proporcionado por tu profesor</p>
+
+            <div className="mb-5 space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setJoinModalInitialTab('qr');
+                  setShowJoinModal(true);
+                }}
+                className="w-full py-3 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/40 text-cyan-400 font-bold text-xs transition flex items-center justify-center gap-2"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>📷 Escanear Código QR con la Cámara</span>
+              </button>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-radar-border"></div>
+                <span className="flex-shrink mx-3 text-[10px] text-slate-500 uppercase font-semibold">O código manual</span>
+                <div className="flex-grow border-t border-radar-border"></div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Código de Invitación / Grupo
+                </label>
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  placeholder="Ej: RUN-4821"
+                  className="w-full bg-[#0B0F19] border-2 border-cyan-500/50 rounded-2xl px-4 py-3.5 text-center text-xl font-black font-mono tracking-widest text-cyan-400 uppercase focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+            </div>
+
+            {/* Tarjeta de Confirmación de Grupo Detectado */}
+            {matchedOnboardingGroup ? (
+              <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 mb-6 animate-fadeIn">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-bold">
+                    ✓ Entrenador Detectado:
+                  </span>
+                </div>
+                <div className="text-sm font-bold text-white">{coach?.name || 'Profesor de Running'}</div>
+                <div className="text-xs text-emerald-300 mt-0.5">
+                  Grupo: {matchedOnboardingGroup.name} ({matchedOnboardingGroup.inviteCode})
+                </div>
+              </div>
+            ) : inviteCode.trim() ? (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 mb-6 text-amber-300 text-xs">
+                ⚠️ No encontramos ningún grupo con el código "{inviteCode}". Verifica con tu profesor o continúa en Modo Libre.
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-radar-border mb-6 text-slate-400 text-xs text-center">
+                ¿No tienes entrenador aún? Puedes continuar en <strong>Modo Libre</strong> y unirte más tarde en cualquier momento.
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep(2)}
+                className="py-3.5 px-5 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 transition"
+              >
+                Atrás
+              </button>
+              <button
+                onClick={() => setStep(4)}
+                className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-extrabold text-sm tracking-wide shadow-lg shadow-cyan-500/20 transition flex items-center justify-center gap-2"
+              >
+                {matchedOnboardingGroup ? 'UNIRME AL GRUPO' : 'CONTINUAR (MODO LIBRE)'} <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
-
-          <div className="mb-6">
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              Código de Invitación / Grupo
-            </label>
-            <input
-              type="text"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-              placeholder="RUN-4821"
-              className="w-full bg-[#0B0F19] border-2 border-cyan-500/50 rounded-2xl px-4 py-3.5 text-center text-xl font-black font-mono tracking-widest text-cyan-400 uppercase focus:outline-none focus:border-cyan-400"
-            />
-          </div>
-
-          {/* Tarjeta de Confirmación de Grupo Detectado */}
-          <div className="p-4 rounded-2xl bg-[#0B0F19] border border-radar-border mb-8">
-            <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block mb-1">Entrenador Detectado:</span>
-            <div className="text-sm font-bold text-white">Profesor Juan Pérez</div>
-            <div className="text-xs text-cyan-400 mt-0.5">Grupo: Running Martes y Jueves (19:00 hs)</div>
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => setStep(2)}
-              className="py-3.5 px-5 rounded-2xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 transition"
-            >
-              Atrás
-            </button>
-            <button
-              onClick={() => setStep(4)}
-              className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-extrabold text-sm tracking-wide shadow-lg shadow-cyan-500/20 transition flex items-center justify-center gap-2"
-            >
-              UNIRME AL GRUPO <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ================= PASO 4: PERMISOS Y SENSORES ================= */}
       {step === 4 && (
@@ -510,7 +562,7 @@ export const RunnerView: React.FC = () => {
           
           {/* Status Top Pill & Dedicated Full-Width Tabs */}
           <div className="space-y-3">
-            {/* Cabecera de Identidad del Corredor y Estado de Grupo */}
+            {/* Cabecera de Identidad del Corredor */}
             <div className="bg-radar-card border border-radar-border rounded-2xl p-3.5 flex items-center justify-between shadow-lg">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-blue-600/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-extrabold text-sm shrink-0">
@@ -526,7 +578,7 @@ export const RunnerView: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 truncate">
-                    {runnerGroup?.name || 'Pelotón de Running'} • {coach?.name || 'Profesor Juan'}
+                    {currentRunner?.email || 'corredor@runradar.app'}
                   </p>
                 </div>
               </div>
@@ -542,6 +594,78 @@ export const RunnerView: React.FC = () => {
                 Editar Mis Datos
               </button>
             </div>
+
+            {/* Banner de Conexión Real con el Entrenador */}
+            {isCoachConnected && runnerGroup ? (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/50 via-slate-900 to-[#0B0F19] border border-emerald-500/40 flex items-center justify-between gap-3 shadow-lg animate-fadeIn">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <Radio className="w-4 h-4 animate-pulse" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                      <span className="text-xs font-black text-emerald-400 uppercase tracking-wide">
+                        CONECTADO AL ENTRENADOR
+                      </span>
+                    </div>
+                    <p className="text-xs text-white font-bold truncate">
+                      {runnerGroup.name} <span className="text-emerald-400 font-mono font-normal">({runnerGroup.inviteCode})</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (confirm('¿Deseas desconectarte del grupo y volver a Modo Libre?')) {
+                      await leaveGroup();
+                    }
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 hover:border-rose-500/50 hover:text-rose-300 text-slate-300 border border-slate-700 text-[11px] font-bold transition flex items-center gap-1 shrink-0"
+                  title="Desconectar del grupo"
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>Salir</span>
+                </button>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/30 via-slate-900 to-[#0B0F19] border border-amber-500/40 shadow-lg space-y-2.5 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-black text-amber-400 uppercase tracking-wide block">
+                      MODO LIBRE • SIN ENTRENADOR ASIGNADO
+                    </span>
+                    <span className="text-[11px] text-slate-400 block truncate">
+                      Tus datos son privados en tu móvil. Vincúlate a un profesor:
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setJoinModalInitialTab('qr');
+                      setShowJoinModal(true);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs transition flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Escanear QR</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setJoinModalInitialTab('code');
+                      setShowJoinModal(true);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-800/40 font-bold text-xs transition flex items-center justify-center gap-1.5"
+                  >
+                    <Hash className="w-3.5 h-3.5" />
+                    <span>Ingresar Código</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Navigation Tabs (3 columnas balanceadas para móviles) */}
             <div className="grid grid-cols-3 bg-[#0B0F19] p-1 rounded-2xl border border-radar-border text-xs gap-1">
@@ -729,6 +853,41 @@ export const RunnerView: React.FC = () => {
 
           {/* ================= TAB 2: ESTADO COLECTIVO (PELOTÓN) ================= */}
           {activeScreenTab === 'collective' && (
+            !isCoachConnected ? (
+              <div className="bg-radar-card border border-radar-border rounded-3xl p-6 sm:p-8 text-center shadow-2xl space-y-5 animate-fadeIn">
+                <div className="w-16 h-16 rounded-3xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto text-cyan-400 shadow-xl shadow-cyan-500/10">
+                  <Users className="w-8 h-8" />
+                </div>
+                <div className="space-y-2 max-w-sm mx-auto">
+                  <h3 className="text-lg font-black text-white">Aún no formas parte de un Pelotón</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Para ver el radar colectivo en vivo, comparar tu ritmo contra la media del pelotón y aparecer en el mapa de tu entrenador, únete a su grupo.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2 max-w-xs mx-auto">
+                  <button
+                    onClick={() => {
+                      setJoinModalInitialTab('qr');
+                      setShowJoinModal(true);
+                    }}
+                    className="py-3 px-4 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>Escanear QR Entrenador</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setJoinModalInitialTab('code');
+                      setShowJoinModal(true);
+                    }}
+                    className="py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-800/40 font-bold text-xs transition flex items-center justify-center gap-2"
+                  >
+                    <Hash className="w-4 h-4" />
+                    <span>Ingresar Código</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="space-y-4 animate-fadeIn">
               
               {/* Comparador de Ritmo: Tú vs Pelotón */}
@@ -887,6 +1046,7 @@ export const RunnerView: React.FC = () => {
               </div>
 
             </div>
+            )
           )}
 
           {/* ================= TAB 3: PERMISOS Y PRIVACIDAD ================= */}
@@ -1003,6 +1163,14 @@ export const RunnerView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal para Escanear QR o Ingresar Código de Entrenador */}
+      <QRScannerModal
+        isOpen={showJoinModal}
+        onClose={() => setShowJoinModal(false)}
+        onJoin={joinGroup}
+        initialTab={joinModalInitialTab}
+      />
 
     </div>
   );

@@ -51,6 +51,8 @@ interface RadarContextType {
   emitRunnerSample: (sample: Partial<MetricSample>) => void;
   updateRunnerPermissions: (athleteId: string, permissions: Partial<AthletePermissions>) => Promise<void>;
   updateRunnerProfile: (data: { name: string; lastName: string; email?: string; phone?: string }) => Promise<void>;
+  joinGroup: (codeOrUrl: string) => Promise<{ success: boolean; group?: Group; error?: string }>;
+  leaveGroup: () => Promise<void>;
   exportCSV: (sessionId?: string) => void;
 }
 
@@ -422,15 +424,17 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {}
   };
 
-  const joinRunner = async (data: { name: string; lastName: string; email: string; inviteCode: string; permissions: AthletePermissions }) => {
-    const matchedGroup = groups.find(g => g.inviteCode?.toUpperCase() === data.inviteCode?.trim()?.toUpperCase()) || groups[0];
+  const joinRunner = async (data: { name: string; lastName: string; email: string; inviteCode?: string; permissions: AthletePermissions }) => {
+    const matchedGroup = data.inviteCode 
+      ? (groups.find(g => g.inviteCode?.toUpperCase() === data.inviteCode?.trim()?.toUpperCase()) || null)
+      : null;
     const newId = `athlete-${Date.now()}`;
     const newAthlete: Athlete = {
       id: newId,
       name: data.name || 'Nuevo',
       lastName: data.lastName || 'Corredor',
       email: data.email || `${newId}@runradar.app`,
-      groupIds: [matchedGroup ? matchedGroup.id : 'group-martes'],
+      groupIds: matchedGroup ? [matchedGroup.id] : [],
       maxHeartRate: 185,
       restingHeartRate: 60,
       targetPaceMin: matchedGroup?.targetPaceRange?.[0] || 330,
@@ -485,17 +489,101 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setAthletes(prev => [...prev.filter(a => a.id !== newAthlete.id), newAthlete]);
     setCurrentRunnerId(newAthlete.id);
-    if (matchedGroup) setSelectedGroupId(matchedGroup.id);
+    if (matchedGroup) {
+      setSelectedGroupId(matchedGroup.id);
+    } else {
+      setSelectedGroupId(null);
+    }
 
     try {
       localStorage.setItem('runradar_session', JSON.stringify({
         role: 'runner',
         athleteId: newAthlete.id,
-        groupId: matchedGroup ? matchedGroup.id : 'group-martes'
+        groupId: matchedGroup ? matchedGroup.id : null,
+        groupCode: matchedGroup ? matchedGroup.inviteCode : null
       }));
     } catch (e) {}
 
     return { success: true, athlete: newAthlete };
+  };
+
+  const parseJoinCode = (raw: string): string => {
+    try {
+      if (raw.includes('join=')) {
+        const url = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+        const code = url.searchParams.get('join');
+        if (code) return code.trim().toUpperCase();
+      }
+    } catch (e) {}
+    return raw.trim().toUpperCase();
+  };
+
+  const joinGroup = async (codeOrUrl: string) => {
+    const code = parseJoinCode(codeOrUrl);
+    const targetGroup = groups.find(g => g.inviteCode?.toUpperCase() === code);
+    if (!targetGroup) {
+      return { success: false, error: `Código no encontrado ("${code}"). Pídeselo a tu entrenador.` };
+    }
+
+    if (currentRunnerId) {
+      setAthletes(prev => prev.map(ath => {
+        if (ath.id !== currentRunnerId) return ath;
+        const updated = {
+          ...ath,
+          groupIds: [targetGroup.id]
+        };
+        if (isSupabaseConfigured && supabase) {
+          supabase.from('athletes').upsert({
+            id: updated.id,
+            group_ids: updated.groupIds
+          }).then(() => {}, (e) => console.warn(e));
+        }
+        return updated;
+      }));
+    }
+
+    setSelectedGroupId(targetGroup.id);
+
+    try {
+      const saved = localStorage.getItem('runradar_session');
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem('runradar_session', JSON.stringify({
+        ...parsed,
+        groupId: targetGroup.id,
+        groupCode: targetGroup.inviteCode
+      }));
+    } catch (e) {}
+
+    return { success: true, group: targetGroup };
+  };
+
+  const leaveGroup = async () => {
+    if (currentRunnerId) {
+      setAthletes(prev => prev.map(ath => {
+        if (ath.id !== currentRunnerId) return ath;
+        const updated = {
+          ...ath,
+          groupIds: []
+        };
+        if (isSupabaseConfigured && supabase) {
+          supabase.from('athletes').upsert({
+            id: updated.id,
+            group_ids: []
+          }).then(() => {}, (e) => console.warn(e));
+        }
+        return updated;
+      }));
+    }
+    setSelectedGroupId(null);
+    try {
+      const saved = localStorage.getItem('runradar_session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        delete parsed.groupId;
+        delete parsed.groupCode;
+        localStorage.setItem('runradar_session', JSON.stringify(parsed));
+      }
+    } catch (e) {}
   };
 
   const createGroup = async (data: {
@@ -688,6 +776,8 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         emitRunnerSample,
         updateRunnerPermissions,
         updateRunnerProfile,
+        joinGroup,
+        leaveGroup,
         exportCSV,
       }}
     >
