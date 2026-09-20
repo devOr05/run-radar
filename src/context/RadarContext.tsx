@@ -48,6 +48,7 @@ interface RadarContextType {
   clearAlert: (athleteId: string) => Promise<void>;
   joinRunner: (data: { name: string; lastName: string; email: string; inviteCode: string; permissions: AthletePermissions }) => Promise<{ success: boolean; athlete?: Athlete; error?: string }>;
   createGroup: (data: { name: string; schedule?: string; description?: string; inviteCode?: string; targetDistance?: number; targetPaceRange?: [number, number] }) => Promise<Group>;
+  emitRunnerSample: (sample: Partial<MetricSample>) => void;
   updateRunnerPermissions: (athleteId: string, permissions: Partial<AthletePermissions>) => Promise<void>;
   exportCSV: (sessionId?: string) => void;
 }
@@ -534,6 +535,56 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return newGroup;
   };
 
+  const emitRunnerSample = (partialSample: Partial<MetricSample>) => {
+    if (!currentRunnerId) return;
+
+    setAthletes((prevAthletes) => {
+      return prevAthletes.map((ath) => {
+        if (ath.id !== currentRunnerId) return ath;
+
+        const prev = ath.lastSample;
+        const lat = partialSample.latitude ?? prev?.latitude;
+        const lng = partialSample.longitude ?? prev?.longitude;
+        const hr = partialSample.heartRate ?? prev?.heartRate ?? 145;
+
+        const updatedTrail = ath.trail ? [...ath.trail] : [];
+        if (lat && lng) {
+          updatedTrail.push([lat, lng]);
+          if (updatedTrail.length > 50) updatedTrail.shift();
+        }
+
+        const fullSample: MetricSample = {
+          athleteId: ath.id,
+          timestamp: Date.now(),
+          heartRate: hr,
+          zone: (hr > 175 ? 5 : (hr > 155 ? 4 : (hr > 135 ? 3 : 2))) as any,
+          pace: partialSample.pace ?? prev?.pace ?? 330,
+          speed: partialSample.speed ?? prev?.speed ?? 10.0,
+          cadence: partialSample.cadence ?? prev?.cadence ?? 160,
+          distance: partialSample.distance ?? prev?.distance ?? 0,
+          latitude: lat,
+          longitude: lng,
+          altitude: partialSample.altitude ?? prev?.altitude ?? 20,
+          battery: partialSample.battery ?? prev?.battery ?? 90,
+          signalQuality: 'excellent',
+          source: partialSample.source ?? prev?.source ?? 'phone',
+          sourceDevice: partialSample.sourceDevice ?? prev?.sourceDevice ?? '📱 Celular GPS'
+        };
+
+        if (isSupabaseConfigured && selectedGroupId) {
+          supabaseService.broadcastSample(selectedGroupId, fullSample);
+        }
+
+        return {
+          ...ath,
+          lastSample: fullSample,
+          lastSeen: Date.now(),
+          trail: updatedTrail
+        };
+      });
+    });
+  };
+
   const updateRunnerPermissions = async (athleteId: string, permissions: Partial<AthletePermissions>) => {
     setAthletes(prev => prev.map(a => a.id === athleteId ? {
       ...a,
@@ -582,6 +633,7 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         clearAlert,
         joinRunner,
         createGroup,
+        emitRunnerSample,
         updateRunnerPermissions,
         exportCSV,
       }}

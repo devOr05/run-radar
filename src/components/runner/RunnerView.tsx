@@ -26,7 +26,7 @@ import {
 import { formatPace, formatDistance, formatDuration, calculateHeartRateZone, getZoneDetails } from '../../lib/calculations';
 
 export const RunnerView: React.FC = () => {
-  const { currentRunner, joinRunner, updateRunnerPermissions, groups, athletes, coach } = useRadar();
+  const { currentRunner, joinRunner, updateRunnerPermissions, groups, athletes, coach, emitRunnerSample } = useRadar();
 
   // Pasos de Onboarding: 1. Intro, 2. Datos, 3. Entrenador, 4. Permisos, 5. Mi Entrenamiento (Listo)
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(currentRunner ? 5 : 1);
@@ -62,7 +62,9 @@ export const RunnerView: React.FC = () => {
       phoneAdapter.connect().then((ok) => {
         if (ok) {
           phoneAdapter.startStream((sample) => {
-            // Sample recibido del sensor real del navegador si está habilitado
+            if (emitRunnerSample) {
+              emitRunnerSample(sample);
+            }
           });
         }
       });
@@ -71,7 +73,7 @@ export const RunnerView: React.FC = () => {
         phoneAdapter.stopStream();
       };
     }
-  }, [step]);
+  }, [step, emitRunnerSample]);
 
   const handleJoin = async () => {
     const res = await joinRunner({
@@ -103,6 +105,11 @@ export const RunnerView: React.FC = () => {
     setIsBluetoothConnecting(false);
     if (ok) {
       setBluetoothStatus('connected');
+      bleAdapter.startStream((sample) => {
+        if (emitRunnerSample) {
+          emitRunnerSample(sample);
+        }
+      });
     } else {
       setBluetoothStatus('unsupported');
     }
