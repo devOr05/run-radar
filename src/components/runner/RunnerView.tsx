@@ -51,6 +51,7 @@ export const RunnerView: React.FC = () => {
   const [editName, setEditName] = useState(currentRunner?.name || '');
   const [editLastName, setEditLastName] = useState(currentRunner?.lastName || '');
   const [editEmail, setEditEmail] = useState(currentRunner?.email || '');
+  const [editPhone, setEditPhone] = useState(currentRunner?.phone || '');
 
   // Información del reloj / sensor Bluetooth conectado
   const [bleDeviceInfo, setBleDeviceInfo] = useState<BluetoothDeviceInfo | null>(null);
@@ -127,6 +128,7 @@ export const RunnerView: React.FC = () => {
       name,
       lastName,
       email,
+      phone,
       inviteCode,
       permissions
     });
@@ -151,16 +153,21 @@ export const RunnerView: React.FC = () => {
       setEditName(currentRunner.name || '');
       setEditLastName(currentRunner.lastName || '');
       setEditEmail(currentRunner.email || '');
+      setEditPhone(currentRunner.phone || '');
     }
   }, [currentRunner]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editName.trim()) return;
+    if (!editName.trim()) {
+      alert('Por favor ingresa tu nombre');
+      return;
+    }
     await updateRunnerProfile({
       name: editName.trim(),
       lastName: editLastName.trim(),
-      email: editEmail.trim()
+      email: editEmail.trim(),
+      phone: editPhone.trim()
     });
     setShowEditProfileModal(false);
   };
@@ -653,9 +660,15 @@ export const RunnerView: React.FC = () => {
                       ACTIVO
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 truncate">
-                    {currentRunner?.email || 'corredor@runradar.app'}
-                  </p>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400 truncate">
+                    <span>{currentRunner?.email || 'Sin email'}</span>
+                    {currentRunner?.phone && (
+                      <>
+                        <span>•</span>
+                        <span className="text-cyan-400 font-mono font-medium">📱 {currentRunner.phone}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               <button
@@ -663,6 +676,7 @@ export const RunnerView: React.FC = () => {
                   setEditName(currentRunner?.name || '');
                   setEditLastName(currentRunner?.lastName || '');
                   setEditEmail(currentRunner?.email || '');
+                  setEditPhone(currentRunner?.phone || '');
                   setShowEditProfileModal(true);
                 }}
                 className="px-2.5 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-400 border border-cyan-800/50 text-[11px] font-bold transition shrink-0"
@@ -1249,9 +1263,25 @@ export const RunnerView: React.FC = () => {
                   value={editLastName}
                   onChange={(e) => setEditLastName(e.target.value)}
                   className="w-full bg-[#0B0F19] border border-radar-border rounded-xl px-3.5 py-2.5 text-white text-sm focus:border-cyan-400 outline-none"
-                  placeholder="Ej: Gómez"
-                  required
+                  placeholder="Ej: Gómez (opcional)"
                 />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold flex items-center justify-between">
+                  <span>Teléfono / Celular:</span>
+                  <span className="text-[10px] text-emerald-400 font-normal">Visible para tu entrenador</span>
+                </label>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full bg-[#0B0F19] border border-radar-border rounded-xl px-3.5 py-2.5 text-white text-sm focus:border-cyan-400 outline-none"
+                  placeholder="Ej: +54 9 223 123-4567"
+                />
+                <span className="text-[10px] text-slate-400 block mt-1">
+                  Tu profesor podrá contactarte o llamarte en caso de emergencia durante la carrera.
+                </span>
               </div>
 
               <div>

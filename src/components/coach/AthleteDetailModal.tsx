@@ -72,11 +72,22 @@ export const AthleteDetailModal: React.FC<AthleteDetailModalProps> = ({ athlete,
                 {statusInfo.icon} {statusInfo.label}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1 flex items-center gap-3">
-              <span>{athlete.email}</span>
-              {athlete.phone && <span>• {athlete.phone}</span>}
-              <span>• Última señal: {formatRelativeTime(athlete.lastSeen)}</span>
-            </p>
+            <div className="text-xs text-slate-400 mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="text-slate-300">{athlete.email}</span>
+              {athlete.phone && (
+                <a
+                  href={`https://wa.me/${athlete.phone.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold hover:bg-emerald-500/30 transition flex items-center gap-1 shrink-0"
+                  title="Contactar al corredor por WhatsApp o llamada"
+                >
+                  <Smartphone className="w-3 h-3 text-emerald-400" />
+                  <span>{athlete.phone}</span>
+                </a>
+              )}
+              <span className="text-slate-500">• Última señal: {formatRelativeTime(athlete.lastSeen)}</span>
+            </div>
           </div>
         </div>
 

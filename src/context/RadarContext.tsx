@@ -46,11 +46,11 @@ interface RadarContextType {
   resetSimulator: () => Promise<void>;
   injectAlert: (athleteId: string, alertType: 'high_hr' | 'z5' | 'low_battery' | 'disconnect') => Promise<void>;
   clearAlert: (athleteId: string) => Promise<void>;
-  joinRunner: (data: { name: string; lastName: string; email: string; inviteCode: string; permissions: AthletePermissions }) => Promise<{ success: boolean; athlete?: Athlete; error?: string }>;
+  joinRunner: (data: { name: string; lastName?: string; email?: string; phone?: string; inviteCode?: string; permissions: AthletePermissions }) => Promise<{ success: boolean; athlete?: Athlete; error?: string }>;
   createGroup: (data: { name: string; schedule?: string; description?: string; inviteCode?: string; targetDistance?: number; targetPaceRange?: [number, number] }) => Promise<Group>;
   emitRunnerSample: (sample: Partial<MetricSample>) => void;
   updateRunnerPermissions: (athleteId: string, permissions: Partial<AthletePermissions>) => Promise<void>;
-  updateRunnerProfile: (data: { name: string; lastName: string; email?: string; phone?: string }) => Promise<void>;
+  updateRunnerProfile: (data: { name: string; lastName?: string; email?: string; phone?: string }) => Promise<void>;
   joinGroup: (codeOrUrl: string) => Promise<{ success: boolean; group?: Group; error?: string }>;
   leaveGroup: () => Promise<void>;
   exportCSV: (sessionId?: string) => void;
@@ -63,7 +63,19 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isConnected, setIsConnected] = useState(false);
   const [coach, setCoach] = useState<Coach | null>(initialCoach);
   const [groups, setGroups] = useState<Group[]>(initialGroups);
-  const [athletes, setAthletes] = useState<Athlete[]>(initialAthletes);
+  const [athletes, setAthletes] = useState<Athlete[]>(() => {
+    try {
+      const savedCustom = localStorage.getItem('runradar_custom_athletes');
+      if (savedCustom) {
+        const parsed = JSON.parse(savedCustom) as Athlete[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const mockWithoutCustom = initialAthletes.filter(a => !parsed.some(p => p.id === a.id));
+          return [...parsed, ...mockWithoutCustom];
+        }
+      }
+    } catch (e) {}
+    return initialAthletes;
+  });
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>('group-martes');
   const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<TrainingSession | null>(initialActiveSession);
@@ -404,16 +416,17 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return null;
   };
 
-  const joinRunner = async (data: { name: string; lastName: string; email: string; inviteCode?: string; permissions: AthletePermissions }) => {
+  const joinRunner = async (data: { name: string; lastName?: string; email?: string; phone?: string; inviteCode?: string; permissions: AthletePermissions }) => {
     const matchedGroup = data.inviteCode 
       ? findMatchingGroup(data.inviteCode, groups)
       : null;
     const newId = `athlete-${Date.now()}`;
     const newAthlete: Athlete = {
       id: newId,
-      name: data.name || 'Nuevo',
-      lastName: data.lastName || 'Corredor',
-      email: data.email || `${newId}@runradar.app`,
+      name: data.name?.trim() || 'Corredor',
+      lastName: data.lastName?.trim() || '',
+      email: data.email?.trim() || `${newId}@runradar.app`,
+      phone: data.phone?.trim() || undefined,
       groupIds: matchedGroup ? [matchedGroup.id] : [],
       maxHeartRate: 185,
       restingHeartRate: 60,
@@ -460,6 +473,7 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         name: newAthlete.name,
         last_name: newAthlete.lastName,
         email: newAthlete.email,
+        phone: newAthlete.phone,
         group_ids: newAthlete.groupIds,
         max_heart_rate: newAthlete.maxHeartRate,
         resting_heart_rate: newAthlete.restingHeartRate,
@@ -467,7 +481,15 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }).then(() => {}, (err: any) => console.warn('Supabase athlete insert err', err));
     }
 
-    setAthletes(prev => [...prev.filter(a => a.id !== newAthlete.id), newAthlete]);
+    setAthletes(prev => {
+      const next = [...prev.filter(a => a.id !== newAthlete.id), newAthlete];
+      try {
+        const customAthletes = next.filter(a => a.id.startsWith('athlete-') || a.id === newAthlete.id);
+        localStorage.setItem('runradar_custom_athletes', JSON.stringify(customAthletes));
+      } catch (e) {}
+      return next;
+    });
+
     setCurrentRunnerId(newAthlete.id);
     if (matchedGroup) {
       setSelectedGroupId(matchedGroup.id);
@@ -479,6 +501,7 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       localStorage.setItem('runradar_session', JSON.stringify({
         role: 'runner',
         athleteId: newAthlete.id,
+        athleteName: `${newAthlete.name} ${newAthlete.lastName}`.trim(),
         groupId: matchedGroup ? matchedGroup.id : null,
         groupCode: matchedGroup ? matchedGroup.inviteCode : null
       }));
@@ -679,44 +702,81 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {}
   };
 
-  const updateRunnerProfile = async (data: { name: string; lastName: string; email?: string; phone?: string }) => {
-    if (!currentRunnerId) return;
+  const updateRunnerProfile = async (data: { name: string; lastName?: string; email?: string; phone?: string }) => {
+    let runnerId = currentRunnerId;
+    if (!runnerId) {
+      runnerId = `athlete-${Date.now()}`;
+      setCurrentRunnerId(runnerId);
+    }
 
-    setAthletes((prev) =>
-      prev.map((a) => {
-        if (a.id !== currentRunnerId) return a;
-        const updated = {
-          ...a,
-          name: data.name.trim() || a.name,
-          lastName: data.lastName.trim() || a.lastName,
-          email: data.email?.trim() || a.email,
-          phone: data.phone?.trim() || a.phone
-        };
+    setAthletes((prev) => {
+      const existing = prev.find((a) => a.id === runnerId);
+      const updated: Athlete = existing
+        ? {
+            ...existing,
+            name: data.name.trim(),
+            lastName: data.lastName !== undefined ? data.lastName.trim() : existing.lastName,
+            email: data.email !== undefined ? data.email.trim() : existing.email,
+            phone: data.phone !== undefined ? data.phone.trim() : existing.phone
+          }
+        : {
+            id: runnerId!,
+            name: data.name.trim(),
+            lastName: (data.lastName || '').trim(),
+            email: (data.email || '').trim(),
+            phone: (data.phone || '').trim(),
+            groupIds: selectedGroupId ? [selectedGroupId] : [],
+            maxHeartRate: 185,
+            restingHeartRate: 60,
+            currentStatus: 'normal',
+            lastSeen: Date.now(),
+            devices: [],
+            permissions: {
+              heartRate: true,
+              location: true,
+              workouts: true,
+              steps: true,
+              cadence: true,
+              elevation: true,
+              calories: true,
+              wearables: true,
+              updatedAt: Date.now()
+            }
+          };
 
-        if (isSupabaseConfigured && supabase) {
-          supabase
-            .from('athletes')
-            .upsert({
-              id: updated.id,
-              name: updated.name,
-              last_name: updated.lastName,
-              email: updated.email
-            })
-            .then(() => {}, (err) => console.warn('Supabase athlete profile update err', err));
-        }
+      const next = [...prev.filter((a) => a.id !== runnerId), updated];
 
-        try {
-          const saved = localStorage.getItem('runradar_session');
-          const parsed = saved ? JSON.parse(saved) : {};
-          localStorage.setItem('runradar_session', JSON.stringify({
-            ...parsed,
-            athleteName: `${updated.name} ${updated.lastName}`
-          }));
-        } catch (e) {}
+      try {
+        const customAthletes = next.filter((a) => a.id === runnerId || a.id.startsWith('athlete-'));
+        localStorage.setItem('runradar_custom_athletes', JSON.stringify(customAthletes));
+      } catch (e) {}
 
-        return updated;
-      })
-    );
+      return next;
+    });
+
+    if (isSupabaseConfigured && supabase) {
+      supabase
+        .from('athletes')
+        .upsert({
+          id: runnerId,
+          name: data.name.trim(),
+          last_name: data.lastName?.trim() || '',
+          email: data.email?.trim() || '',
+          phone: data.phone?.trim() || ''
+        })
+        .then(() => {}, (err) => console.warn('Supabase athlete profile update err', err));
+    }
+
+    try {
+      const saved = localStorage.getItem('runradar_session');
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem('runradar_session', JSON.stringify({
+        ...parsed,
+        role: 'runner',
+        athleteId: runnerId,
+        athleteName: `${data.name.trim()} ${data.lastName?.trim() || ''}`.trim()
+      }));
+    } catch (e) {}
   };
 
   const exportCSV = (sessionId?: string) => {

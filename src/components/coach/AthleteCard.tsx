@@ -39,6 +39,11 @@ export const AthleteCard: React.FC<AthleteCardProps> = ({ athlete, onClick }) =>
           </h4>
         </div>
         <div className="flex items-center gap-1.5">
+          {athlete.phone && (
+            <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700" title={`Tel: ${athlete.phone}`}>
+              📱
+            </span>
+          )}
           <span
             className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${statusInfo.badgeBg} ${statusInfo.badgeText} ${statusInfo.badgeBorder}`}
           >
