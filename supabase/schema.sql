@@ -5,11 +5,13 @@
 -- 1. TABLA DE GRUPOS DE ENTRENAMIENTO
 CREATE TABLE IF NOT EXISTS groups (
   id TEXT PRIMARY KEY,
+  coach_id TEXT,
   name TEXT NOT NULL,
   description TEXT,
   schedule TEXT,
   invite_code TEXT UNIQUE NOT NULL,
   target_distance FLOAT DEFAULT 5.0,
+  target_pace_range JSONB DEFAULT '[330, 390]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
