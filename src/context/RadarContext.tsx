@@ -47,6 +47,7 @@ interface RadarContextType {
   injectAlert: (athleteId: string, alertType: 'high_hr' | 'z5' | 'low_battery' | 'disconnect') => Promise<void>;
   clearAlert: (athleteId: string) => Promise<void>;
   joinRunner: (data: { name: string; lastName: string; email: string; inviteCode: string; permissions: AthletePermissions }) => Promise<{ success: boolean; athlete?: Athlete; error?: string }>;
+  createGroup: (data: { name: string; schedule?: string; description?: string; inviteCode?: string; targetDistance?: number; targetPaceRange?: [number, number] }) => Promise<Group>;
   updateRunnerPermissions: (athleteId: string, permissions: Partial<AthletePermissions>) => Promise<void>;
   exportCSV: (sessionId?: string) => void;
 }
@@ -488,6 +489,51 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { success: true, athlete: newAthlete };
   };
 
+  const createGroup = async (data: {
+    name: string;
+    schedule?: string;
+    description?: string;
+    inviteCode?: string;
+    targetDistance?: number;
+    targetPaceRange?: [number, number];
+  }): Promise<Group> => {
+    const newId = `group-${Date.now()}`;
+    const code = data.inviteCode || `RUN-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newGroup: Group = {
+      id: newId,
+      organizationId: 'org-central',
+      coachId: coach?.id || 'coach-juan',
+      name: data.name,
+      description: data.description || '',
+      schedule: data.schedule || 'Días a convenir',
+      inviteCode: code,
+      targetDistance: data.targetDistance || 8,
+      targetPaceRange: data.targetPaceRange || [330, 390],
+      athleteCount: 0,
+      activeAthletesCount: 0,
+      statusSummary: { normal: 0, attention: 0, alert: 0, offline: 0 }
+    };
+
+    setGroups(prev => [newGroup, ...prev]);
+    setSelectedGroupId(newId);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('groups').upsert({
+        id: newGroup.id,
+        coach_id: newGroup.coachId,
+        name: newGroup.name,
+        description: newGroup.description,
+        schedule: newGroup.schedule,
+        invite_code: newGroup.inviteCode,
+        target_distance: newGroup.targetDistance,
+        target_pace_range: newGroup.targetPaceRange
+      }).then(() => {}, (err: any) => console.warn('Supabase group upsert err', err));
+    }
+
+    return newGroup;
+  };
+
   const updateRunnerPermissions = async (athleteId: string, permissions: Partial<AthletePermissions>) => {
     setAthletes(prev => prev.map(a => a.id === athleteId ? {
       ...a,
@@ -535,6 +581,7 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         injectAlert,
         clearAlert,
         joinRunner,
+        createGroup,
         updateRunnerPermissions,
         exportCSV,
       }}

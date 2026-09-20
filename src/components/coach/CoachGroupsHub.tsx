@@ -18,10 +18,12 @@ import {
 } from 'lucide-react';
 import { NewSessionModal } from './NewSessionModal';
 import { GroupShareModal } from './GroupShareModal';
+import { NewGroupModal } from './NewGroupModal';
 
 export const CoachGroupsHub: React.FC = () => {
   const { groups, athletes, setSelectedGroupId, activeSession, startSession } = useRadar();
   const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
+  const [isNewGroupModalOpen, setIsNewGroupModalOpen] = useState(false);
   const [selectedGroupForQR, setSelectedGroupForQR] = useState<Group | null>(null);
 
   // Totales globales para el resumen superior
@@ -50,13 +52,23 @@ export const CoachGroupsHub: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsNewSessionModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs transition shadow-lg shadow-cyan-500/20 shrink-0"
-        >
-          <Play className="w-4 h-4 fill-current" />
-          <span>Iniciar Nueva Sesión</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsNewGroupModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/40 text-white font-bold text-xs transition shrink-0"
+          >
+            <Plus className="w-4 h-4 text-cyan-400" />
+            <span>Crear Nuevo Grupo</span>
+          </button>
+
+          <button
+            onClick={() => setIsNewSessionModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs transition shadow-lg shadow-cyan-500/20 shrink-0"
+          >
+            <Play className="w-4 h-4 fill-current" />
+            <span>Iniciar Nueva Sesión</span>
+          </button>
+        </div>
       </div>
 
       {/* Global Counters Bar */}
@@ -218,6 +230,25 @@ export const CoachGroupsHub: React.FC = () => {
             );
           })}
         </div>
+
+        {groups.length === 0 && (
+          <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
+            <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-4">
+              <Users className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">No tienes grupos activos</h3>
+            <p className="text-xs text-slate-400 max-w-md mb-6">
+              Crea tu primer grupo de running para generar el código QR y enlace de WhatsApp para que tus atletas se unan.
+            </p>
+            <button
+              onClick={() => setIsNewGroupModalOpen(true)}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs transition shadow-lg shadow-cyan-500/20"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Crear Mi Primer Grupo</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* QR & WhatsApp Share Modal */}
@@ -225,6 +256,17 @@ export const CoachGroupsHub: React.FC = () => {
         <GroupShareModal
           group={selectedGroupForQR}
           onClose={() => setSelectedGroupForQR(null)}
+        />
+      )}
+
+      {/* Modal de Nuevo Grupo */}
+      {isNewGroupModalOpen && (
+        <NewGroupModal
+          onClose={() => setIsNewGroupModalOpen(false)}
+          onCreated={(newGroup) => {
+            setIsNewGroupModalOpen(false);
+            setSelectedGroupForQR(newGroup);
+          }}
         />
       )}
 
