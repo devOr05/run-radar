@@ -372,9 +372,41 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {}
   };
 
+  const normalizeStr = (s: string) => 
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  const findMatchingGroup = (query: string, groupsList: Group[]): Group | null => {
+    if (!query) return null;
+    const clean = query.trim();
+    const upper = clean.toUpperCase();
+    const norm = normalizeStr(clean);
+
+    // 1. Coincidencia exacta por inviteCode
+    const byCode = groupsList.find(g => g.inviteCode?.toUpperCase() === upper);
+    if (byCode) return byCode;
+
+    // 2. Coincidencia exacta por ID
+    const byId = groupsList.find(g => g.id.toUpperCase() === upper);
+    if (byId) return byId;
+
+    // 3. Coincidencia por nombre exacto (sin tildes / minúsculas)
+    const byExactName = groupsList.find(g => normalizeStr(g.name) === norm);
+    if (byExactName) return byExactName;
+
+    // 4. Coincidencia por subcadena de nombre si la búsqueda tiene al menos 3 caracteres
+    if (norm.length >= 3) {
+      const byPartial = groupsList.find(g => 
+        normalizeStr(g.name).includes(norm) || norm.includes(normalizeStr(g.name))
+      );
+      if (byPartial) return byPartial;
+    }
+
+    return null;
+  };
+
   const joinRunner = async (data: { name: string; lastName: string; email: string; inviteCode?: string; permissions: AthletePermissions }) => {
     const matchedGroup = data.inviteCode 
-      ? (groups.find(g => g.inviteCode?.toUpperCase() === data.inviteCode?.trim()?.toUpperCase()) || null)
+      ? findMatchingGroup(data.inviteCode, groups)
       : null;
     const newId = `athlete-${Date.now()}`;
     const newAthlete: Athlete = {
@@ -466,11 +498,11 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return raw.trim().toUpperCase();
   };
 
-  const joinGroup = async (codeOrUrl: string) => {
-    const code = parseJoinCode(codeOrUrl);
-    const targetGroup = groups.find(g => g.inviteCode?.toUpperCase() === code);
+  const joinGroup = async (codeOrNameOrUrl: string) => {
+    const code = parseJoinCode(codeOrNameOrUrl);
+    const targetGroup = findMatchingGroup(code, groups) || findMatchingGroup(codeOrNameOrUrl, groups);
     if (!targetGroup) {
-      return { success: false, error: `Código no encontrado ("${code}"). Pídeselo a tu entrenador.` };
+      return { success: false, error: `Grupo no encontrado ("${codeOrNameOrUrl}"). Puedes ingresar el código o el nombre de tu grupo.` };
     }
 
     if (currentRunnerId) {

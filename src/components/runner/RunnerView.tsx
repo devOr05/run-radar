@@ -413,8 +413,15 @@ export const RunnerView: React.FC = () => {
 
       {/* ================= PASO 3: QUIÉN ES TU ENTRENADOR ================= */}
       {step === 3 && (() => {
-        const matchedOnboardingGroup = inviteCode.trim() 
-          ? groups.find(g => g.inviteCode?.toUpperCase() === inviteCode.trim().toUpperCase()) 
+        const clean = inviteCode.trim();
+        const norm = clean.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const matchedOnboardingGroup = clean 
+          ? groups.find(g => 
+              g.inviteCode?.toUpperCase() === clean.toUpperCase() ||
+              g.id.toUpperCase() === clean.toUpperCase() ||
+              g.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === norm ||
+              (norm.length >= 3 && g.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(norm))
+            ) 
           : null;
 
         return (
@@ -425,7 +432,7 @@ export const RunnerView: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">¿Quién es tu Entrenador?</h2>
-                <p className="text-xs text-slate-400">Escanea el QR o ingresa el código de tu grupo</p>
+                <p className="text-xs text-slate-400">Escanea el QR o ingresa el código o nombre de tu grupo</p>
               </div>
             </div>
 
@@ -444,22 +451,44 @@ export const RunnerView: React.FC = () => {
 
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-radar-border"></div>
-                <span className="flex-shrink mx-3 text-[10px] text-slate-500 uppercase font-semibold">O código manual</span>
+                <span className="flex-shrink mx-3 text-[10px] text-slate-500 uppercase font-semibold">O código / nombre</span>
                 <div className="flex-grow border-t border-radar-border"></div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Código de Invitación / Grupo
+                  Código de Invitación o Nombre del Grupo
                 </label>
                 <input
                   type="text"
                   value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                  placeholder="Ej: RUN-4821"
-                  className="w-full bg-[#0B0F19] border-2 border-cyan-500/50 rounded-2xl px-4 py-3.5 text-center text-xl font-black font-mono tracking-widest text-cyan-400 uppercase focus:outline-none focus:border-cyan-400"
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  placeholder="Ej: RUN-4821 o Grupo Martes"
+                  className="w-full bg-[#0B0F19] border-2 border-cyan-500/50 rounded-2xl px-4 py-3.5 text-center text-lg font-bold text-cyan-400 focus:outline-none focus:border-cyan-400 placeholder:text-slate-600 placeholder:text-sm placeholder:font-normal"
                 />
               </div>
+
+              {/* Grupos disponibles para seleccionar con un clic */}
+              {groups.length > 0 && !matchedOnboardingGroup && (
+                <div className="pt-2 space-y-1.5">
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
+                    O toca tu grupo para seleccionarlo:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {groups.map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setInviteCode(g.name)}
+                        className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 text-xs font-medium transition flex items-center gap-1.5"
+                      >
+                        <span>{g.name}</span>
+                        <span className="text-[10px] text-cyan-400 font-mono">({g.inviteCode})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Tarjeta de Confirmación de Grupo Detectado */}
@@ -708,7 +737,7 @@ export const RunnerView: React.FC = () => {
                     className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-800/40 font-bold text-xs transition flex items-center justify-center gap-1.5"
                   >
                     <Hash className="w-3.5 h-3.5" />
-                    <span>Ingresar Código</span>
+                    <span>Código o Nombre</span>
                   </button>
                 </div>
               </div>
@@ -975,7 +1004,7 @@ export const RunnerView: React.FC = () => {
                     className="py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-800/40 font-bold text-xs transition flex items-center justify-center gap-2"
                   >
                     <Hash className="w-4 h-4" />
-                    <span>Ingresar Código</span>
+                    <span>Código o Nombre de Grupo</span>
                   </button>
                 </div>
               </div>
@@ -1262,6 +1291,7 @@ export const RunnerView: React.FC = () => {
         onClose={() => setShowJoinModal(false)}
         onJoin={joinGroup}
         initialTab={joinModalInitialTab}
+        availableGroups={groups}
       />
 
     </div>

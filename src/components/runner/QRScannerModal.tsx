@@ -1,19 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { QrCode, Hash, X, Camera, AlertCircle, Check, Loader2 } from 'lucide-react';
+import { QrCode, Hash, X, Camera, AlertCircle, Check, Loader2, Users } from 'lucide-react';
+import { Group } from '../../types';
 
 interface QRScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onJoin: (codeOrUrl: string) => Promise<{ success: boolean; error?: string }>;
   initialTab?: 'qr' | 'code';
+  availableGroups?: Group[];
 }
 
 export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   isOpen,
   onClose,
   onJoin,
-  initialTab = 'qr'
+  initialTab = 'qr',
+  availableGroups = []
 }) => {
   const [activeTab, setActiveTab] = useState<'qr' | 'code'>(initialTab);
   const [manualCode, setManualCode] = useState('');
@@ -66,7 +69,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             if (res.success) {
               onClose();
             } else {
-              setErrorMsg(res.error || 'Código de grupo no válido');
+              setErrorMsg(res.error || 'Código o grupo no válido');
               setActiveTab('code');
             }
           },
@@ -77,7 +80,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         console.warn('Error al iniciar cámara QR:', err);
         if (isMounted) {
           setCameraError(
-            'No se pudo acceder a la cámara. Por favor permite el acceso en Chrome o ingresa el código manual abajo.'
+            'No se pudo acceder a la cámara. Por favor permite el acceso en Chrome o ingresa el código o nombre del grupo abajo.'
           );
         }
       }
@@ -113,7 +116,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     if (res.success) {
       onClose();
     } else {
-      setErrorMsg(res.error || 'Código incorrecto. Verifica con tu entrenador.');
+      setErrorMsg(res.error || 'Grupo no encontrado. Verifica con tu entrenador.');
     }
   };
 
@@ -145,7 +148,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           </button>
         </div>
 
-        {/* Selector de Pestañas: Cámara QR vs Código Manual */}
+        {/* Selector de Pestañas: Cámara QR vs Código / Nombre */}
         <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs">
           <button
             type="button"
@@ -176,7 +179,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             }`}
           >
             <Hash className="w-3.5 h-3.5" />
-            <span>Ingresar Código</span>
+            <span>Código o Nombre</span>
           </button>
         </div>
 
@@ -204,7 +207,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                   }}
                   className="px-4 py-2 rounded-xl bg-cyan-500 text-black font-extrabold text-xs"
                 >
-                  Ingresar Código Manualmente
+                  Ingresar Código o Nombre
                 </button>
               </div>
             ) : (
@@ -221,31 +224,31 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           </div>
         )}
 
-        {/* PESTAÑA 2: INGRESAR CÓDIGO MANUAL */}
+        {/* PESTAÑA 2: INGRESAR CÓDIGO MANUAL O NOMBRE */}
         {activeTab === 'code' && (
           <form onSubmit={handleManualSubmit} className="space-y-4">
             <div>
               <label className="text-[11px] font-semibold text-slate-300 block mb-1.5 uppercase tracking-wider">
-                Código de Invitación del Grupo:
+                Código o Nombre del Grupo:
               </label>
               <input
                 type="text"
                 value={manualCode}
-                onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                placeholder="Ej: RUN-4821"
-                className="w-full bg-slate-950 border-2 border-cyan-500/40 focus:border-cyan-400 rounded-2xl px-4 py-3 text-center text-xl font-black font-['JetBrains_Mono',monospace] tracking-widest text-cyan-400 uppercase outline-none transition"
+                onChange={(e) => setManualCode(e.target.value)}
+                placeholder="Ej: RUN-4821 o Grupo Martes"
+                className="w-full bg-slate-950 border-2 border-cyan-500/40 focus:border-cyan-400 rounded-2xl px-4 py-3 text-center text-lg font-bold text-cyan-400 outline-none transition placeholder:text-slate-600 placeholder:text-xs placeholder:font-normal"
                 autoFocus
                 required
               />
               <span className="text-[10px] text-slate-400 block mt-1.5 text-center">
-                Pídele el código de 4 a 8 caracteres a tu entrenador.
+                Escribe el código (ej. <span className="font-mono text-cyan-300">RUN-4821</span>) o el nombre del grupo.
               </span>
             </div>
 
             <button
               type="submit"
               disabled={loading || !manualCode.trim()}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xs uppercase tracking-wider transition shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xs uppercase tracking-wider transition shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <>
@@ -259,6 +262,50 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                 </>
               )}
             </button>
+
+            {/* Grupos disponibles para unirse directo con 1 clic */}
+            {availableGroups && availableGroups.length > 0 && (
+              <div className="pt-2 border-t border-slate-800 space-y-2">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block flex items-center gap-1.5">
+                  <Users className="w-3 h-3 text-cyan-400" />
+                  O toca un grupo para unirte directo:
+                </span>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {availableGroups.map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={async () => {
+                        setLoading(true);
+                        setErrorMsg(null);
+                        const res = await onJoin(g.inviteCode || g.name);
+                        setLoading(false);
+                        if (res.success) {
+                          onClose();
+                        } else {
+                          setErrorMsg(res.error || 'Error al unirse al grupo');
+                        }
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-slate-950 hover:bg-cyan-950/60 border border-slate-800 hover:border-cyan-500/50 text-left transition flex items-center justify-between group cursor-pointer"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <span className="text-xs font-bold text-white group-hover:text-cyan-400 transition block truncate">
+                          {g.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          Código: <span className="font-mono text-cyan-300 font-bold">{g.inviteCode || 'N/A'}</span>
+                          {g.schedule ? ` • ${g.schedule}` : ''}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-bold text-cyan-400 bg-cyan-950/80 px-2 py-1 rounded-lg border border-cyan-800/40 group-hover:bg-cyan-500 group-hover:text-black transition shrink-0">
+                        Unirse →
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </form>
         )}
 
