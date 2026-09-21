@@ -13,14 +13,17 @@ import {
   Sparkles, 
   Check,
   Download,
-  Crown
+  Crown,
+  HelpCircle
 } from 'lucide-react';
+import { DeviceGuideModal } from '../common/DeviceGuideModal';
 
 export const RoleSelectScreen: React.FC = () => {
   const { setUserRole, setCurrentRunnerId, isConnected, joinRunner } = useRadar();
   const [customRunnerName, setCustomRunnerName] = useState('');
   const [customRunnerLastName, setCustomRunnerLastName] = useState('');
   const [runnerCode, setRunnerCode] = useState('');
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -155,6 +158,15 @@ export const RoleSelectScreen: React.FC = () => {
           >
             <Download className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
             <span>{isStandalone ? '✓ App Instalada' : '📲 Instalar App (PWA)'}</span>
+          </button>
+
+          <button
+            onClick={() => setIsGuideOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-bold transition shadow-sm group"
+            title="Ver cómo conectar tu reloj, banda cardíaca o correr con tu celular"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+            <span>📖 Guía de Dispositivos</span>
           </button>
         </div>
       </div>
@@ -326,6 +338,12 @@ export const RoleSelectScreen: React.FC = () => {
       <div className="relative z-10 mt-10 text-center text-xs text-slate-500">
         RunRadar &copy; 2026 — Plataforma de Telemetría para Entrenadores y Grupos de Running
       </div>
+
+      {/* Modal de Guía de Dispositivos */}
+      <DeviceGuideModal 
+        isOpen={isGuideOpen} 
+        onClose={() => setIsGuideOpen(false)} 
+      />
     </div>
   );
 };

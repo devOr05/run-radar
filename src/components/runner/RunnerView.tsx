@@ -29,12 +29,14 @@ import {
   RefreshCw,
   MessageSquare,
   Pin,
-  UserCheck
+  UserCheck,
+  HelpCircle
 } from 'lucide-react';
 import { formatPace, formatDistance, formatDuration, calculateHeartRateZone, getZoneDetails } from '../../lib/calculations';
 import { QRScannerModal } from './QRScannerModal';
 import { GroupChatDrawer } from '../chat/GroupChatDrawer';
 import { GroupForumView } from '../forum/GroupForumView';
+import { DeviceGuideContent } from '../common/DeviceGuideContent';
 
 export const RunnerView: React.FC = () => {
   const { 
@@ -120,7 +122,7 @@ export const RunnerView: React.FC = () => {
   const [isBluetoothConnecting, setIsBluetoothConnecting] = useState(false);
   const [isScanningHr, setIsScanningHr] = useState(false);
   const [bluetoothStatus, setBluetoothStatus] = useState<'idle' | 'connected' | 'reconnecting' | 'unsupported'>('idle');
-  const [activeScreenTab, setActiveScreenTab] = useState<'individual' | 'collective' | 'forum' | 'permissions'>('individual');
+  const [activeScreenTab, setActiveScreenTab] = useState<'individual' | 'collective' | 'forum' | 'permissions' | 'guide'>('individual');
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Conectar adaptador local de Sensores del Celular (GPS + acelerómetro)
@@ -865,8 +867,8 @@ export const RunnerView: React.FC = () => {
               </div>
             )}
 
-            {/* Navigation Tabs (4 columnas para móviles) */}
-            <div className="grid grid-cols-4 bg-[#0B0F19] p-1 rounded-2xl border border-radar-border text-xs gap-1">
+            {/* Navigation Tabs (5 columnas) */}
+            <div className="grid grid-cols-5 bg-[#0B0F19] p-1 rounded-2xl border border-radar-border text-xs gap-1">
               <button
                 onClick={() => setActiveScreenTab('individual')}
                 className={`py-2 px-1 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
@@ -902,6 +904,15 @@ export const RunnerView: React.FC = () => {
               >
                 <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">Permisos</span>
+              </button>
+              <button
+                onClick={() => setActiveScreenTab('guide')}
+                className={`py-2 px-1 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  activeScreenTab === 'guide' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Guía</span>
               </button>
             </div>
           </div>
@@ -1145,23 +1156,36 @@ export const RunnerView: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="p-4 rounded-2xl bg-radar-card border border-radar-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-                      <Bluetooth className="w-5 h-5" />
+                <div className="space-y-2">
+                  <div className="p-4 rounded-2xl bg-radar-card border border-radar-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                        <Bluetooth className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-white block">Vincular Reloj / Sensor Cardíaco</span>
+                        <span className="text-[10px] text-slate-400">Amazfit, Garmin, Polar, Magene, Xiaomi, Smartwatches</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-xs font-bold text-white block">Vincular Reloj / Sensor Cardíaco</span>
-                      <span className="text-[10px] text-slate-400">Amazfit, Garmin, Polar, Magene, Smartwatches</span>
-                    </div>
+                    <button
+                      onClick={handleConnectBluetooth}
+                      disabled={isBluetoothConnecting}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold text-xs transition shrink-0 shadow-lg shadow-blue-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Bluetooth className="w-3.5 h-3.5" />
+                      {isBluetoothConnecting ? 'Buscando...' : 'Vincular Reloj'}
+                    </button>
                   </div>
+
                   <button
-                    onClick={handleConnectBluetooth}
-                    disabled={isBluetoothConnecting}
-                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold text-xs transition shrink-0 shadow-lg shadow-blue-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                    onClick={() => setActiveScreenTab('guide')}
+                    className="w-full text-left p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center justify-between transition cursor-pointer"
                   >
-                    <Bluetooth className="w-3.5 h-3.5" />
-                    {isBluetoothConnecting ? 'Buscando...' : 'Vincular Reloj'}
+                    <span className="flex items-center gap-2">
+                      <HelpCircle className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <span>¿Cómo conectar Xiaomi Band, Amazfit, Garmin o correr con el celular? <strong>Ver Guía ➔</strong></span>
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
                   </button>
                 </div>
               )}
@@ -1431,6 +1455,28 @@ export const RunnerView: React.FC = () => {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* ================= TAB 5: GUÍA DE DISPOSITIVOS Y USO ================= */}
+          {activeScreenTab === 'guide' && (
+            <div className="bg-radar-card border border-radar-border rounded-3xl p-4 sm:p-6 shadow-xl animate-fadeIn space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-radar-border/60">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+                    <HelpCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Manual y Compatibilidad de Dispositivos</h3>
+                    <p className="text-[11px] text-slate-400">Instrucciones claras para conectar cualquier reloj o correr con tu celular</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">
+                  OFICIAL
+                </span>
+              </div>
+
+              <DeviceGuideContent />
             </div>
           )}
 
