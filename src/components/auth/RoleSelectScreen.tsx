@@ -17,6 +17,7 @@ import {
   Lock
 } from 'lucide-react';
 import { DeviceGuideModal } from '../common/DeviceGuideModal';
+import { notifyAdminAccess } from '../../services/telegramNotificationService';
 
 export const RoleSelectScreen: React.FC = () => {
   const { setUserRole, setCurrentRunnerId, isConnected, joinRunner } = useRadar();
@@ -37,6 +38,7 @@ export const RoleSelectScreen: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const queryPin = params.get('pin') || params.get('control') || params.get('admin');
       if (queryPin === '30450890') {
+        notifyAdminAccess('Enlace URL Directo');
         setUserRole('super_admin');
       }
     }
@@ -63,6 +65,7 @@ export const RoleSelectScreen: React.FC = () => {
   const handleVerifyPin = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (secretPinInput.trim() === '30450890') {
+      notifyAdminAccess('PIN 5 Toques');
       setShowSecretModal(false);
       setSecretPinInput('');
       setPinError(false);

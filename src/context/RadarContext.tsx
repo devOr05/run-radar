@@ -23,6 +23,7 @@ import {
   initialActiveSession, 
   initialAlerts 
 } from '../data/initialData';
+import { notifyNewRunner, notifyNewGroupCreated } from '../services/telegramNotificationService';
 
 interface RadarContextType {
   coach: Coach | null;
@@ -571,6 +572,13 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }));
     } catch (e) {}
 
+    // Notificación a Telegram
+    notifyNewRunner(
+      `${newAthlete.name} ${newAthlete.lastName}`.trim(),
+      matchedGroup?.name,
+      newAthlete.devices?.[0]?.name
+    );
+
     return { success: true, athlete: newAthlete };
   };
 
@@ -694,6 +702,9 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         target_pace_range: newGroup.targetPaceRange
       }).then(() => {}, (err: any) => console.warn('Supabase group upsert err', err));
     }
+
+    // Notificación a Telegram
+    notifyNewGroupCreated(newGroup.name, coach?.name || 'Profesor / Entrenador');
 
     return newGroup;
   };

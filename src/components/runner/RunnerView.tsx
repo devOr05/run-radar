@@ -37,6 +37,7 @@ import { QRScannerModal } from './QRScannerModal';
 import { GroupChatDrawer } from '../chat/GroupChatDrawer';
 import { GroupForumView } from '../forum/GroupForumView';
 import { DeviceGuideContent } from '../common/DeviceGuideContent';
+import { DeviceGuideModal } from '../common/DeviceGuideModal';
 
 export const RunnerView: React.FC = () => {
   const { 
@@ -123,6 +124,7 @@ export const RunnerView: React.FC = () => {
   const [isScanningHr, setIsScanningHr] = useState(false);
   const [bluetoothStatus, setBluetoothStatus] = useState<'idle' | 'connected' | 'reconnecting' | 'unsupported'>('idle');
   const [activeScreenTab, setActiveScreenTab] = useState<'individual' | 'collective' | 'forum' | 'permissions' | 'guide'>('individual');
+  const [showDeviceGuideModal, setShowDeviceGuideModal] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Conectar adaptador local de Sensores del Celular (GPS + acelerómetro)
@@ -1154,6 +1156,18 @@ export const RunnerView: React.FC = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* Botón de Ayuda y Guía dentro de la tarjeta de reloj conectado */}
+                  <button
+                    onClick={() => setShowDeviceGuideModal(true)}
+                    className="w-full text-left p-2.5 rounded-xl bg-slate-950/70 hover:bg-slate-900 border border-slate-800 text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center justify-between transition cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <HelpCircle className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <span>¿Problemas de lectura o conexión con tu reloj? <strong>Ver Guía de Soluciones ➔</strong></span>
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1178,7 +1192,7 @@ export const RunnerView: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() => setActiveScreenTab('guide')}
+                    onClick={() => setShowDeviceGuideModal(true)}
                     className="w-full text-left p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center justify-between transition cursor-pointer"
                   >
                     <span className="flex items-center gap-2">
@@ -1602,6 +1616,12 @@ export const RunnerView: React.FC = () => {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         groupId={runnerGroup?.id || 'general'}
+      />
+
+      {/* Modal Interactivo de Guía de Dispositivos */}
+      <DeviceGuideModal
+        isOpen={showDeviceGuideModal}
+        onClose={() => setShowDeviceGuideModal(false)}
       />
 
     </div>
