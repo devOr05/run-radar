@@ -53,6 +53,12 @@ export class PhoneSensorAdapter implements DeviceAdapter {
   private onSampleCallback: ((sample: Partial<MetricSample>) => void) | null = null;
   private lastPosition: GeolocationPosition | null = null;
   private totalDistanceMeters = 0;
+  private totalSteps = 0;
+  private currentCadence = 0;
+  private lastStepTimestamp = 0;
+  private recentStepTimes: number[] = [];
+  private lastAccMagnitude = 9.8;
+  private motionHandler: ((e: DeviceMotionEvent) => void) | null = null;
 
   async connect(): Promise<boolean> {
     if (!('geolocation' in navigator)) {
@@ -70,6 +76,42 @@ export class PhoneSensorAdapter implements DeviceAdapter {
 
   startStream(onSample: (sample: Partial<MetricSample>) => void): void {
     this.onSampleCallback = onSample;
+
+    // 1. Podómetro por Acelerómetro del Celular (DeviceMotionEvent)
+    if (typeof window !== 'undefined' && 'DeviceMotionEvent' in window) {
+      this.motionHandler = (event: DeviceMotionEvent) => {
+        const acc = event.accelerationIncludingGravity || event.acceleration;
+        if (!acc || acc.x === null || acc.y === null || acc.z === null) return;
+
+        const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+        const now = Date.now();
+
+        // Detección de pisada/zancada por oscilación vertical (pico > 12.0 m/s², rebote mín 240ms)
+        if (magnitude > 12.0 && this.lastAccMagnitude <= 12.0 && (now - this.lastStepTimestamp > 240)) {
+          this.totalSteps++;
+          this.lastStepTimestamp = now;
+          this.recentStepTimes.push(now);
+
+          // Ventana deslizante de 8 segundos para cadencia instantánea
+          this.recentStepTimes = this.recentStepTimes.filter(t => now - t <= 8000);
+          if (this.recentStepTimes.length >= 2) {
+            const windowSec = (now - this.recentStepTimes[0]) / 1000;
+            if (windowSec > 0) {
+              this.currentCadence = Math.round((this.recentStepTimes.length / windowSec) * 60);
+            }
+          }
+        }
+        this.lastAccMagnitude = magnitude;
+      };
+
+      try {
+        window.addEventListener('devicemotion', this.motionHandler, { passive: true });
+      } catch (e) {
+        console.warn('No se pudo activar el listener de acelerómetro del teléfono:', e);
+      }
+    }
+
+    // 2. Monitoreo Satelital GPS del Teléfono
     if (!('geolocation' in navigator)) return;
 
     this.watchId = navigator.geolocation.watchPosition(
@@ -105,6 +147,20 @@ export class PhoneSensorAdapter implements DeviceAdapter {
         // Solo computar ritmo de carrera si la velocidad supera 3.0 km/h (evita ritmos absurdos en reposo)
         const pace = (speed >= 3.0 && speed <= 35.0) ? Math.round(3600 / speed) : undefined;
 
+        // Si el teléfono no tiene permisos de acelerómetro o está en soporte estático, estimar pasos por distancia GPS
+        const estimatedStride = (speed && speed > 5) ? 1.05 : 0.78;
+        const gpsEstimatedSteps = Math.round(this.totalDistanceMeters / estimatedStride);
+        const steps = Math.max(this.totalSteps, gpsEstimatedSteps);
+
+        // Cadencia: si no hay oscilación pero hay velocidad de trote
+        let cadence = this.currentCadence;
+        if (cadence === 0 && speed >= 3.0) {
+          cadence = Math.round(142 + Math.min(40, (speed - 3) * 3.8));
+        }
+
+        // Calorías quemadas estimadas (~65 kcal por km recorrido)
+        const calories = Math.round((this.totalDistanceMeters / 1000) * 65);
+
         this.onSampleCallback?.({
           source: 'phone',
           sourceDevice: 'Navegador Móvil GPS',
@@ -115,6 +171,9 @@ export class PhoneSensorAdapter implements DeviceAdapter {
           speed: speed,
           pace: pace,
           distance: Math.round(this.totalDistanceMeters),
+          steps: steps,
+          cadence: cadence > 0 ? cadence : undefined,
+          calories: calories > 0 ? calories : undefined,
           signalQuality: accuracy < 15 ? 'excellent' : 'good'
         });
       },
@@ -133,6 +192,10 @@ export class PhoneSensorAdapter implements DeviceAdapter {
     if (this.watchId !== null) {
       navigator.geolocation.clearWatch(this.watchId);
       this.watchId = null;
+    }
+    if (this.motionHandler && typeof window !== 'undefined') {
+      window.removeEventListener('devicemotion', this.motionHandler);
+      this.motionHandler = null;
     }
   }
 }

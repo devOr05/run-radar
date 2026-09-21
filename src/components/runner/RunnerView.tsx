@@ -942,24 +942,36 @@ export const RunnerView: React.FC = () => {
                   )}
                 </div>
 
-                {/* Sub Métricas Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-[#0B0F19] p-4 rounded-2xl border border-radar-border text-left">
+                {/* Sub Métricas Grid (Calculadas automáticamente por Celular o Sensor) */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 bg-[#0B0F19] p-4 rounded-2xl border border-radar-border text-left">
                   <div>
-                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Mi Ritmo</span>
-                    <span className="text-xl font-extrabold text-white font-mono">
-                      {currentPace ? formatPace(currentPace) : '--:--'}
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Ritmo</span>
+                    <span className="text-lg sm:text-xl font-extrabold text-white font-mono">
+                      {sample?.pace ? formatPace(sample.pace) : '--:--'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Distancia</span>
-                    <span className="text-xl font-extrabold text-white font-mono">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Distancia</span>
+                    <span className="text-lg sm:text-xl font-extrabold text-white font-mono">
                       {formatDistance(sample?.distance || 0)}
                     </span>
                   </div>
-                  <div className="col-span-2 sm:col-span-1">
-                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Tiempo</span>
-                    <span className="text-xl font-extrabold text-cyan-400 font-mono">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Tiempo</span>
+                    <span className="text-lg sm:text-xl font-extrabold text-cyan-400 font-mono">
                       {formatDuration(sessionSeconds)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">👣 Pasos</span>
+                    <span className="text-lg sm:text-xl font-extrabold text-emerald-400 font-mono">
+                      {sample?.steps ? sample.steps.toLocaleString() : (sample?.distance ? Math.round(sample.distance / 0.85).toLocaleString() : '0')}
+                    </span>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">🔄 Cadencia</span>
+                    <span className="text-lg sm:text-xl font-extrabold text-amber-300 font-mono">
+                      {sample?.cadence ? `${sample.cadence} SPM` : '--'}
                     </span>
                   </div>
                 </div>
