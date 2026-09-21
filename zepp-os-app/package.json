@@ -1,0 +1,24 @@
+{
+  "name": "runradar-zeppos-app",
+  "version": "1.0.0",
+  "description": "Mini App nativa de telemetría y transmisión automática de frecuencia cardíaca para RunRadar en Amazfit (Zepp OS 3.0+)",
+  "main": "app.js",
+  "scripts": {
+    "build": "zeus build",
+    "preview": "zeus preview",
+    "dev": "zeus dev"
+  },
+  "keywords": [
+    "zeppos",
+    "amazfit",
+    "runradar",
+    "heart-rate",
+    "running",
+    "telemetry"
+  ],
+  "author": "RunRadar Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@zeppos/zeus-cli": "^1.4.0"
+  }
+}

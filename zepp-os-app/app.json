@@ -1,0 +1,80 @@
+{
+  "configVersion": "v2",
+  "app": {
+    "appType": "app",
+    "appId": 1098421,
+    "appName": "RunRadar",
+    "version": {
+      "code": 1,
+      "name": "1.0.0"
+    },
+    "icon": "assets/icon.png",
+    "vibrate": true
+  },
+  "permissions": [
+    "device:os.bg_service",
+    "data:user.hd.heart_rate",
+    "data:user.hd.step",
+    "data:user.hd.calorie",
+    "device:os.vibrate"
+  ],
+  "module": {
+    "page": {
+      "pages": [
+        "page/index"
+      ]
+    },
+    "app-service": {
+      "services": [
+        "app-service/run_radar_service"
+      ]
+    },
+    "app-side": {
+      "path": "app-side/index"
+    }
+  },
+  "defaultLanguage": "es-ES",
+  "i18n": {
+    "es-ES": {
+      "name": "RunRadar"
+    },
+    "en-US": {
+      "name": "RunRadar"
+    }
+  },
+  "targets": {
+    "bip-5": {
+      "module": {
+        "page": {
+          "pages": [
+            "page/index"
+          ]
+        }
+      },
+      "designWidth": 320,
+      "designHeight": 380
+    },
+    "active": {
+      "module": {
+        "page": {
+          "pages": [
+            "page/index"
+          ]
+        }
+      },
+      "designWidth": 390,
+      "designHeight": 450
+    },
+    "balance": {
+      "module": {
+        "page": {
+          "pages": [
+            "page/index"
+          ]
+        }
+      },
+      "designWidth": 480,
+      "designHeight": 480
+    }
+  }
+}

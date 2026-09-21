@@ -263,3 +263,21 @@ apiRouter.post('/simulator/clear-alert', (req, res) => {
 apiRouter.get('/simulator/config', (_req, res) => {
   res.json(simulatorEngine.getConfig());
 });
+
+// Endpoint para Side Service de Zepp OS y apps de reloj
+apiRouter.post('/telemetry/sample', (req, res) => {
+  const { heartRate, steps, calories, timestamp, athleteId, sourceDevice } = req.body;
+  if (athleteId) {
+    const athlete = dataStore.athletes.get(athleteId);
+    if (athlete) {
+      if (athlete.lastSample) {
+        if (heartRate) athlete.lastSample.heartRate = heartRate;
+        if (steps) athlete.lastSample.steps = steps;
+        if (calories) athlete.lastSample.calories = calories;
+        athlete.lastSample.timestamp = timestamp || Date.now();
+      }
+      athlete.lastSeen = Date.now();
+    }
+  }
+  res.json({ success: true, timestamp: Date.now() });
+});
