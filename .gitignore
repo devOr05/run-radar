@@ -8,9 +8,11 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+/dist
 dist-ssr
 *.local
+!zepp-os-app/dist/
+!zepp-os-app/dist/*.zab
 
 # Editor directories and files
 .vscode/*
