@@ -67,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAlerts }) => {
               {userRole === 'super_admin' ? (
                 <>
                   <Crown className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="font-bold text-amber-400">Super Admin</span>
+                  <span className="font-bold text-amber-400">Control Central</span>
                 </>
               ) : userRole === 'coach' ? (
                 <>

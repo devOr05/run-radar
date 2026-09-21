@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useRadar } from '../../context/RadarContext';
-import { SUPER_ADMIN_EMAIL } from '../../types';
 import { 
   Radio, 
   Users, 
@@ -11,10 +10,11 @@ import {
   Zap, 
   ChevronRight, 
   Sparkles, 
-  Check,
-  Download,
-  Crown,
-  HelpCircle
+  Check, 
+  Download, 
+  Crown, 
+  HelpCircle,
+  Lock
 } from 'lucide-react';
 import { DeviceGuideModal } from '../common/DeviceGuideModal';
 
@@ -24,6 +24,54 @@ export const RoleSelectScreen: React.FC = () => {
   const [customRunnerLastName, setCustomRunnerLastName] = useState('');
   const [runnerCode, setRunnerCode] = useState('');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+
+  // Acceso Maestro Oculto (5 toques en el logo o URL secreta)
+  const [secretTapCount, setSecretTapCount] = useState(0);
+  const [showSecretModal, setShowSecretModal] = useState(false);
+  const [secretPinInput, setSecretPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+
+  // Detección automática por URL privada (?pin=30450890 o ?control=30450890)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      const queryPin = params.get('pin') || params.get('control') || params.get('admin');
+      if (queryPin === '30450890') {
+        setUserRole('super_admin');
+      }
+    }
+  }, [setUserRole]);
+
+  const handleSecretTap = () => {
+    setSecretTapCount((prev) => {
+      const next = prev + 1;
+      if (next >= 5) {
+        setShowSecretModal(true);
+        setSecretPinInput('');
+        setPinError(false);
+        return 0;
+      }
+      return next;
+    });
+
+    // Resetear contador tras 3 segundos de inactividad
+    setTimeout(() => {
+      setSecretTapCount(0);
+    }, 3000);
+  };
+
+  const handleVerifyPin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (secretPinInput.trim() === '30450890') {
+      setShowSecretModal(false);
+      setSecretPinInput('');
+      setPinError(false);
+      setUserRole('super_admin');
+    } else {
+      setPinError(true);
+      setTimeout(() => setPinError(false), 2000);
+    }
+  };
 
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -127,11 +175,18 @@ export const RoleSelectScreen: React.FC = () => {
 
       {/* Main Header */}
       <div className="relative z-10 text-center max-w-2xl mx-auto mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-xl shadow-cyan-500/20 mb-4 border border-cyan-400/30">
+        <div 
+          onClick={handleSecretTap}
+          className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 shadow-xl shadow-cyan-500/20 mb-4 border border-cyan-400/30 cursor-pointer select-none active:scale-95 transition-transform"
+          title="RUNRADAR"
+        >
           <Radio className="w-9 h-9 text-black animate-pulse" />
         </div>
         
-        <div className="flex items-center justify-center gap-2 mb-2">
+        <div 
+          onClick={handleSecretTap}
+          className="flex items-center justify-center gap-2 mb-2 cursor-pointer select-none"
+        >
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white font-['JetBrains_Mono',monospace]">
             RUN<span className="text-cyan-400">RADAR</span>
           </h1>
@@ -303,39 +358,12 @@ export const RoleSelectScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Acceso Maestro: Super Administrador (orostizagamario@gmail.com) */}
-      <div className="relative z-10 mt-6 max-w-4xl w-full">
-        <button
-          onClick={() => setUserRole('super_admin')}
-          className="w-full p-4 rounded-2xl bg-gradient-to-r from-amber-950/30 via-slate-900 to-indigo-950/30 border border-amber-500/30 hover:border-amber-400 text-slate-300 hover:text-white transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 group shadow-lg cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition shadow-inner">
-              <Crown className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-amber-300 uppercase tracking-wider">
-                  Acceso Maestro • Super Administrador
-                </span>
-                <span className="text-[10px] font-mono text-amber-400 bg-amber-950 px-1.5 py-0.5 rounded border border-amber-800">
-                  ADMIN
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-400 block mt-0.5">
-                Visión general global de todos los grupos y corredores ({SUPER_ADMIN_EMAIL})
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400 shrink-0 self-end sm:self-center">
-            <span>Entrar al Centro de Control</span>
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </div>
-        </button>
-      </div>
-
-      {/* Footer info */}
-      <div className="relative z-10 mt-10 text-center text-xs text-slate-500">
+      {/* Footer info con acceso secreto por toques */}
+      <div 
+        onClick={handleSecretTap}
+        className="relative z-10 mt-12 text-center text-xs text-slate-500 cursor-pointer select-none hover:text-slate-400 transition"
+        title="RunRadar"
+      >
         RunRadar &copy; 2026 — Plataforma de Telemetría para Entrenadores y Grupos de Running
       </div>
 
@@ -344,6 +372,64 @@ export const RoleSelectScreen: React.FC = () => {
         isOpen={isGuideOpen} 
         onClose={() => setIsGuideOpen(false)} 
       />
+
+      {/* Modal Secreto de Autenticación por PIN */}
+      {showSecretModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn"
+          onClick={() => setShowSecretModal(false)}
+        >
+          <div 
+            className="bg-[#0e1422] border border-slate-700/80 rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 animate-scaleUp text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+              <Lock className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-white">Centro de Control</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Ingresa tu clave de seguridad</p>
+            </div>
+
+            <form onSubmit={handleVerifyPin} className="space-y-3">
+              <input
+                type="password"
+                autoFocus
+                value={secretPinInput}
+                onChange={(e) => setSecretPinInput(e.target.value)}
+                placeholder="PIN"
+                maxLength={12}
+                className={`w-full text-center text-xl font-mono tracking-widest bg-slate-900 border ${
+                  pinError ? 'border-rose-500 text-rose-400 animate-shake' : 'border-slate-700 text-white focus:border-amber-400'
+                } rounded-2xl px-4 py-3 focus:outline-none transition`}
+              />
+
+              {pinError && (
+                <span className="text-xs text-rose-400 font-semibold block animate-fadeIn">
+                  Código de seguridad incorrecto
+                </span>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowSecretModal(false)}
+                  className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-semibold transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black transition shadow-lg shadow-amber-500/20"
+                >
+                  Acceder
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

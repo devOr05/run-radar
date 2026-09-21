@@ -20,7 +20,6 @@ import {
   Send,
   Eye
 } from 'lucide-react';
-import { SUPER_ADMIN_EMAIL } from '../../types';
 
 export const SuperAdminDashboard: React.FC = () => {
   const { 
@@ -96,7 +95,7 @@ export const SuperAdminDashboard: React.FC = () => {
               </span>
             </div>
             <h1 className="text-xl font-black text-white tracking-wide flex items-center gap-2">
-              Super Administrador <span className="text-xs font-mono font-normal text-amber-300">({SUPER_ADMIN_EMAIL})</span>
+              Centro de Control Global <span className="text-xs font-mono font-normal text-amber-300">• Visión Central</span>
             </h1>
           </div>
         </div>
