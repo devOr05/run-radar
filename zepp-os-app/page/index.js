@@ -1,5 +1,6 @@
 import { createWidget, widget, align, text_style } from '@zos/ui';
 import { HeartRate, Step } from '@zos/sensor';
+import { getDeviceInfo } from '@zos/device';
 
 Page({
   state: {
@@ -13,11 +14,36 @@ Page({
   },
 
   build() {
-    // 1. Título Superior
+    // 1. Obtener dimensiones dinámicas del reloj para centrado universal
+    let screenW = 480;
+    let screenH = 480;
+    try {
+      const dev = getDeviceInfo();
+      if (dev && dev.width) {
+        screenW = dev.width;
+        screenH = dev.height;
+      }
+    } catch (e) {
+      console.warn('Error reading device info:', e);
+    }
+
+    // Cálculo proporcional de posiciones verticales
+    const yTitle = Math.floor(screenH * 0.08);
+    const yStatus = Math.floor(screenH * 0.17);
+    const yHrLabel = Math.floor(screenH * 0.26);
+    const yHrVal = Math.floor(screenH * 0.33);
+    const yBpmLabel = Math.floor(screenH * 0.50);
+    const ySteps = Math.floor(screenH * 0.58);
+    const yCoach = Math.floor(screenH * 0.70);
+
+    const cardW = Math.min(screenW - 40, 360);
+    const cardX = Math.floor((screenW - cardW) / 2);
+
+    // 1. Título Superior (Centrado)
     createWidget(widget.TEXT, {
-      x: 10,
-      y: 20,
-      w: 300,
+      x: 0,
+      y: yTitle,
+      w: screenW,
       h: 30,
       color: 0x00F0FF,
       text_size: 20,
@@ -25,11 +51,11 @@ Page({
       text: 'RUNRADAR'
     });
 
-    // 2. Indicador de Estado de Conexión
+    // 2. Indicador de Estado de Conexión (Centrado)
     this.state.statusTextWidget = createWidget(widget.TEXT, {
-      x: 10,
-      y: 55,
-      w: 300,
+      x: 0,
+      y: yStatus,
+      w: screenW,
       h: 24,
       color: 0x10B981,
       text_size: 14,
@@ -37,11 +63,11 @@ Page({
       text: '🟢 Conectado al Pelotón'
     });
 
-    // 3. Frecuencia Cardíaca Gigante
+    // 3. Frecuencia Cardíaca Gigante (Centrado)
     createWidget(widget.TEXT, {
-      x: 10,
-      y: 95,
-      w: 300,
+      x: 0,
+      y: yHrLabel,
+      w: screenW,
       h: 22,
       color: 0xF43F5E,
       text_size: 14,
@@ -50,9 +76,9 @@ Page({
     });
 
     this.state.hrTextWidget = createWidget(widget.TEXT, {
-      x: 10,
-      y: 125,
-      w: 300,
+      x: 0,
+      y: yHrVal,
+      w: screenW,
       h: 70,
       color: 0xFFFFFF,
       text_size: 52,
@@ -61,21 +87,21 @@ Page({
     });
 
     createWidget(widget.TEXT, {
-      x: 10,
-      y: 195,
-      w: 300,
-      h: 20,
+      x: 0,
+      y: yBpmLabel,
+      w: screenW,
+      h: 22,
       color: 0x94A3B8,
       text_size: 14,
       align_h: align.CENTER_H,
       text: 'BPM'
     });
 
-    // 4. Contador de Pasos
+    // 4. Contador de Pasos (Centrado)
     this.state.stepTextWidget = createWidget(widget.TEXT, {
-      x: 10,
-      y: 235,
-      w: 300,
+      x: 0,
+      y: ySteps,
+      w: screenW,
       h: 30,
       color: 0x38BDF8,
       text_size: 18,
@@ -83,12 +109,12 @@ Page({
       text: '👣 0 pasos'
     });
 
-    // 5. Caja de Mensajes del Entrenador
+    // 5. Caja de Mensajes del Entrenador (Centrado horizontal exacto)
     this.state.coachMessageWidget = createWidget(widget.TEXT, {
-      x: 15,
-      y: 285,
-      w: 290,
-      h: 60,
+      x: cardX,
+      y: yCoach,
+      w: cardW,
+      h: 70,
       color: 0xFBBF24,
       text_size: 13,
       align_h: align.CENTER_H,
