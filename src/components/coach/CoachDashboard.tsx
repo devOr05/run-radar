@@ -35,7 +35,9 @@ import {
   Radio,
   Pin,
   RotateCcw,
-  X
+  X,
+  Share2,
+  MessageCircle
 } from 'lucide-react';
 import { formatDuration } from '../../lib/calculations';
 
@@ -209,6 +211,21 @@ export const CoachDashboard: React.FC = () => {
           >
             <Watch className="w-3.5 h-3.5 text-amber-400" />
             <span>Orden al Reloj</span>
+          </button>
+
+          {/* Botón Compartir Invitación Directa por WhatsApp */}
+          <button
+            onClick={() => {
+              if (!currentGroup) return;
+              const inviteUrl = `${window.location.origin}/?join=${currentGroup.inviteCode}&group=${encodeURIComponent(currentGroup.name)}`;
+              const text = `🏃 ¡Hola! Te invito a unirte a nuestro grupo de running *${currentGroup.name}* en RunRadar.\n\n📲 Abre este enlace desde tu celular para ingresar directamente y seguir tus métricas y el estado del pelotón en vivo:\n${inviteUrl}\n\nCódigo de grupo: *${currentGroup.inviteCode}*`;
+              window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition shadow-sm cursor-pointer"
+            title="Compartir enlace de invitación directamente por WhatsApp"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/20" />
+            <span>Invitar por WhatsApp</span>
           </button>
 
           <div className="h-5 w-px bg-slate-800 hidden sm:block" />

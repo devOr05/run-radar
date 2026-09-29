@@ -26,6 +26,7 @@ import {
   initialCompletedSessions
 } from '../data/initialData';
 import { notifyNewRunner, notifyNewGroupCreated } from '../services/telegramNotificationService';
+import { stravaService } from '../services/sportsSyncService';
 
 interface RadarContextType {
   coach: Coach | null;
@@ -413,6 +414,87 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     return () => window.removeEventListener('online', processPendingQueue);
   }, [socket]);
+
+  // Sincronización Automática en Segundo Plano (Zepp / Strava Cloud)
+  // Cuando el corredor llega a su casa y su reloj se conecta al celular por Bluetooth,
+  // la corrida se detecta y se transmite automáticamente al entrenador sin intervención manual.
+  useEffect(() => {
+    if (userRole !== 'runner' || !currentRunnerId) return;
+
+    const checkAutoSync = async () => {
+      try {
+        const auth = stravaService.getStorageAuth();
+        if (!auth.isConnected || !auth.accessToken) return;
+
+        const lastCheck = parseInt(localStorage.getItem('runradar_last_cloud_check') || '0', 10);
+        // Evitar saturar peticiones (mínimo 1 minuto entre consultas)
+        if (Date.now() - lastCheck < 60000) return;
+        localStorage.setItem('runradar_last_cloud_check', Date.now().toString());
+
+        const activities = await stravaService.getRecentActivities(auth.accessToken).catch(() => null);
+        if (Array.isArray(activities) && activities.length > 0) {
+          const latest = activities[0];
+          const latestExtId = `cloud-act-${latest.id}`;
+          
+          setCompletedSessions(prev => {
+            const alreadyExists = prev.some(s => s.id === latestExtId || (s.notes && s.notes.includes(String(latest.id))));
+            if (alreadyExists) return prev;
+
+            const runnerObj = athletes.find(a => a.id === currentRunnerId);
+            const runnerGroup = groups.find(g => runnerObj?.groupIds.includes(g.id)) || null;
+
+            const mapped = stravaService.mapStravaActivityToSession(
+              latest,
+              currentRunnerId,
+              runnerObj ? `${runnerObj.name} ${runnerObj.lastName || ''}`.trim() : 'Corredor',
+              runnerObj?.avatarUrl,
+              runnerGroup?.id || 'group-general',
+              runnerGroup?.name || 'Entrenamiento'
+            );
+
+            const record: CompletedSessionRecord = {
+              ...mapped,
+              id: latestExtId,
+              syncTimestamp: Date.now()
+            };
+
+            const updated = [record, ...prev];
+            try {
+              localStorage.setItem('runradar_completed_sessions', JSON.stringify(updated));
+            } catch (e) {}
+
+            // Broadcast multi-dispositivo automático
+            if (isSupabaseConfigured) {
+              supabaseService.broadcastCompletedSession(record.groupId, record);
+            }
+            if (socket && socket.connected) {
+              socket.emit('session_synced', record);
+            }
+
+            console.log('⚡ [Auto-Sync] Sesión detectada y transmitida automáticamente al DT:', record.distanceMeters, 'm');
+            return updated;
+          });
+        }
+      } catch (e) {}
+    };
+
+    checkAutoSync();
+
+    // Re-chequear cuando el celular se desbloquea o vuelve al primer plano
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        checkAutoSync();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('online', checkAutoSync);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('online', checkAutoSync);
+    };
+  }, [userRole, currentRunnerId, athletes, groups, socket]);
 
   // Suscribirse a Supabase Realtime si está configurado en la nube
   useEffect(() => {

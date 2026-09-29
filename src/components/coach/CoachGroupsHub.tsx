@@ -14,7 +14,8 @@ import {
   Heart, 
   Sparkles,
   ChevronRight,
-  Radio
+  Radio,
+  MessageCircle
 } from 'lucide-react';
 import { NewSessionModal } from './NewSessionModal';
 import { GroupShareModal } from './GroupShareModal';
@@ -212,6 +213,21 @@ export const CoachGroupsHub: React.FC = () => {
                     title="Código QR e Invitación"
                   >
                     <QrCode className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const inviteUrl = `${window.location.origin}/?join=${group.inviteCode}&group=${encodeURIComponent(group.name)}`;
+                      const text = `🏃 ¡Hola! Te invito a unirte a nuestro grupo de running *${group.name}* en RunRadar.\n\n📲 Abre este enlace desde tu celular para ingresar directamente y seguir tus métricas y el estado del pelotón en vivo:\n${inviteUrl}\n\nCódigo de grupo: *${group.inviteCode}*`;
+                      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+                    }}
+                    className="p-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 transition flex items-center gap-1.5 text-xs font-bold"
+                    title="Mandar Invitación por WhatsApp"
+                  >
+                    <MessageCircle className="w-4 h-4 fill-emerald-400/20" />
+                    <span className="hidden sm:inline">WhatsApp</span>
                   </button>
 
                   <button

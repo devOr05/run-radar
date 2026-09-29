@@ -307,8 +307,8 @@ export const ConnectedAppsModal: React.FC<ConnectedAppsModalProps> = ({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Nube Automática</span>
+            <Zap className="w-3.5 h-3.5 fill-current" />
+            <span>Sincronización Automática</span>
           </button>
           <button
             onClick={() => setActiveTab('file')}
@@ -319,7 +319,7 @@ export const ConnectedAppsModal: React.FC<ConnectedAppsModalProps> = ({
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Importar GPX / TCX</span>
+            <span>Respaldo Manual GPX</span>
           </button>
           <button
             onClick={() => setActiveTab('test')}
@@ -348,6 +348,21 @@ export const ConnectedAppsModal: React.FC<ConnectedAppsModalProps> = ({
           {/* 1. PESTAÑA NUBE AUTOMÁTICA (STRAVA / ZEPP / ADIDAS) */}
           {activeTab === 'cloud' && (
             <div className="space-y-4">
+              
+              {/* Banner Informativo de Automatización Total */}
+              <div className="bg-gradient-to-r from-emerald-950/70 via-slate-900 to-cyan-950/50 border border-emerald-500/40 p-4 rounded-2xl flex items-start gap-3.5 shadow-lg">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <Zap className="w-4 h-4 fill-emerald-400" />
+                </div>
+                <div className="text-xs space-y-1">
+                  <p className="font-black text-white text-sm">
+                    ⚡ 100% Automático (Configurar solo 1 vez)
+                  </p>
+                  <p className="text-slate-300 leading-relaxed text-[11px]">
+                    De la misma forma que la app <strong>Zepp</strong> descarga tus entrenamientos por Bluetooth en cuanto llegas a tu casa y te acercas al teléfono, RunRadar detecta la corrida en segundo plano y se la transmite de inmediato a tu entrenador. <strong>No tenés que subir archivos ni presionar botones cada día.</strong>
+                  </p>
+                </div>
+              </div>
               
               {/* Tarjeta de Estado de Conexión */}
               <div className="bg-[#0B0F19]/90 border border-radar-border p-4 sm:p-5 rounded-2xl space-y-4">

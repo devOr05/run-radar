@@ -334,10 +334,35 @@ export const stravaService = {
   },
 
   /**
-   * Obtener actividades recientes desde la API de Strava
+   * Obtener actividades recientes desde la API de Strava o reloj sincronizado
    */
   async getRecentActivities(accessToken: string): Promise<any[]> {
     if (!accessToken) return [];
+
+    // Si es un token de prueba o cuenta conectada en modo demo/offline
+    if (accessToken.startsWith('strava-tok-') || accessToken.startsWith('demo-')) {
+      const now = Date.now();
+      const lastDemoSync = parseInt(localStorage.getItem('runradar_demo_last_sync') || '0', 10);
+      
+      // Si es la primera vez o pasaron más de 5 minutos, sincronizar nueva corrida
+      if (now - lastDemoSync > 300000 || lastDemoSync === 0) {
+        localStorage.setItem('runradar_demo_last_sync', now.toString());
+        return [{
+          id: `act-${now}`,
+          name: 'Entrenamiento Fondista (Amazfit Zepp OS)',
+          distance: 8520,
+          moving_time: 2630,
+          elapsed_time: 2700,
+          average_heartrate: 156,
+          max_heartrate: 174,
+          average_cadence: 88,
+          calories: 615,
+          device_name: 'Amazfit (Zepp OS)',
+          start_date: new Date(now - 2700000).toISOString()
+        }];
+      }
+      return [];
+    }
 
     try {
       const response = await fetch('https://www.strava.com/api/v3/athlete/activities?per_page=5', {

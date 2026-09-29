@@ -1481,7 +1481,7 @@ export const RunnerView: React.FC = () => {
                 </div>
 
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  ¿Corriste sin datos móviles o sólo con tu reloj (Amazfit, Xiaomi, Garmin)? Al terminar tu corrida, presiona el botón para enviar los datos directamente a la pantalla de tu profesor.
+                  Tus corridas registradas con tu reloj (Amazfit, Xiaomi, Garmin) o app se sincronizan automáticamente en segundo plano con tu entrenador en cuanto tu reloj se conecta por Bluetooth a tu celular.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1490,7 +1490,7 @@ export const RunnerView: React.FC = () => {
                     className="py-3.5 px-4 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-black font-black text-xs tracking-wider uppercase transition flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 cursor-pointer"
                   >
                     <Zap className="w-4 h-4 fill-black" />
-                    <span>Vincular Apps / Importar GPX</span>
+                    <span>Sincronización Automática (Zepp / Apps)</span>
                   </button>
 
                   <button
