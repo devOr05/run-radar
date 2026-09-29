@@ -40,7 +40,7 @@ export const ConnectedAppsModal: React.FC<ConnectedAppsModalProps> = ({
   onSessionSynced
 }) => {
   const { currentRunner, groups, saveCompletedSession } = useRadar();
-  const runnerGroup = groups.find(g => currentRunner?.groupIds?.includes(g.id)) || null;
+  const runnerGroup = groups.find(g => currentRunner?.groupIds?.includes(g.id)) || groups[0] || null;
 
   const [activeTab, setActiveTab] = useState<'cloud' | 'file' | 'test'>('cloud');
 

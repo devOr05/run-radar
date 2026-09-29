@@ -39,15 +39,18 @@ export const GroupSessionsHistoryView: React.FC<GroupSessionsHistoryViewProps> =
   const [selectedAthleteFilter, setSelectedAthleteFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week'>('all');
 
-  // Filtrar sesiones por el grupo actual
-  const groupSessions = useMemo(() => {
-    return completedSessions.filter(s => s.groupId === currentGroup.id);
-  }, [completedSessions, currentGroup.id]);
-
   // Atletas que tienen sesiones en este grupo
   const groupAthletes = useMemo(() => {
     return athletes.filter(a => a.groupIds.includes(currentGroup.id));
   }, [athletes, currentGroup.id]);
+
+  // Filtrar sesiones por el grupo actual o atletas asignados a este grupo
+  const groupSessions = useMemo(() => {
+    return completedSessions.filter(s => 
+      s.groupId === currentGroup.id || 
+      groupAthletes.some(a => a.id === s.athleteId)
+    );
+  }, [completedSessions, currentGroup.id, groupAthletes]);
 
   // Filtrado compuesto
   const filteredSessions = useMemo(() => {
