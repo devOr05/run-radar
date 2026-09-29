@@ -37,6 +37,7 @@ import {
 import { formatPace, formatDistance, formatDuration, calculateHeartRateZone, getZoneDetails } from '../../lib/calculations';
 import { QRScannerModal } from './QRScannerModal';
 import { SyncOfflineModal } from './SyncOfflineModal';
+import { ConnectedAppsModal } from './ConnectedAppsModal';
 import { GroupChatDrawer } from '../chat/GroupChatDrawer';
 import { GroupForumView } from '../forum/GroupForumView';
 import { DeviceGuideContent } from '../common/DeviceGuideContent';
@@ -130,6 +131,7 @@ export const RunnerView: React.FC = () => {
   const [activeScreenTab, setActiveScreenTab] = useState<'individual' | 'collective' | 'sessions' | 'forum' | 'permissions' | 'guide'>('individual');
   const [showDeviceGuideModal, setShowDeviceGuideModal] = useState(false);
   const [showSyncOfflineModal, setShowSyncOfflineModal] = useState(false);
+  const [showConnectedAppsModal, setShowConnectedAppsModal] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Conectar adaptador local de Sensores del Celular (GPS + acelerómetro)
@@ -1238,6 +1240,17 @@ export const RunnerView: React.FC = () => {
                     </span>
                     <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
                   </button>
+
+                  <button
+                    onClick={() => setShowConnectedAppsModal(true)}
+                    className="w-full text-left p-3 rounded-2xl bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-transparent hover:bg-orange-500/20 border border-orange-500/30 text-[11px] text-amber-300 hover:text-amber-200 flex items-center justify-between transition cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>¿Usas <strong>Amazfit Zepp</strong> o <strong>Adidas Running</strong>? <strong>Sincronizar Cuentas o Importar GPX ➔</strong></span>
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-amber-500/70 shrink-0" />
+                  </button>
                 </div>
               )}
             </>
@@ -1471,13 +1484,23 @@ export const RunnerView: React.FC = () => {
                   ¿Corriste sin datos móviles o sólo con tu reloj (Amazfit, Xiaomi, Garmin)? Al terminar tu corrida, presiona el botón para enviar los datos directamente a la pantalla de tu profesor.
                 </p>
 
-                <button
-                  onClick={() => setShowSyncOfflineModal(true)}
-                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-extrabold text-xs tracking-wider uppercase transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer"
-                >
-                  <Watch className="w-4 h-4 fill-black" />
-                  <span>Sincronizar Sesión Offline del Reloj / Celular</span>
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    onClick={() => setShowConnectedAppsModal(true)}
+                    className="py-3.5 px-4 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 hover:from-orange-400 hover:to-yellow-400 text-black font-black text-xs tracking-wider uppercase transition flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 cursor-pointer"
+                  >
+                    <Zap className="w-4 h-4 fill-black" />
+                    <span>Vincular Apps / Importar GPX</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowSyncOfflineModal(true)}
+                    className="py-3.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-extrabold text-xs tracking-wider uppercase transition flex items-center justify-center gap-2 shadow cursor-pointer"
+                  >
+                    <Watch className="w-4 h-4 text-cyan-400" />
+                    <span>Carga Manual del Reloj</span>
+                  </button>
+                </div>
               </div>
 
               {/* Lista de Sesiones del Corredor */}
@@ -1500,12 +1523,21 @@ export const RunnerView: React.FC = () => {
                     <p className="text-xs text-slate-400 max-w-xs mx-auto">
                       Al finalizar tus entrenamientos en vivo o al sincronizar tu reloj deportivo, todas tus actividades quedarán listadas aquí.
                     </p>
-                    <button
-                      onClick={() => setShowSyncOfflineModal(true)}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-xs font-bold transition"
-                    >
-                      Sincronizar mi primer entrenamiento →
-                    </button>
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                      <button
+                        onClick={() => setShowConnectedAppsModal(true)}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-black text-xs font-black transition shadow-lg shadow-orange-500/20 flex items-center gap-1.5"
+                      >
+                        <Zap className="w-3.5 h-3.5 fill-black" />
+                        <span>Vincular Zepp / Adidas o Importar GPX</span>
+                      </button>
+                      <button
+                        onClick={() => setShowSyncOfflineModal(true)}
+                        className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-xs font-bold transition"
+                      >
+                        Carga manual →
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1824,6 +1856,13 @@ export const RunnerView: React.FC = () => {
         currentCalories={sample?.calories || 0}
         currentSteps={sample?.steps || 0}
         onSuccess={() => setActiveScreenTab('sessions')}
+      />
+
+      {/* Modal de Cuentas Deportivas Conectadas (Strava, Zepp, Adidas) e Importador GPX */}
+      <ConnectedAppsModal
+        isOpen={showConnectedAppsModal}
+        onClose={() => setShowConnectedAppsModal(false)}
+        onSessionSynced={() => setActiveScreenTab('sessions')}
       />
 
     </div>
