@@ -7,6 +7,7 @@ import { NewSessionModal } from './NewSessionModal';
 import { GroupShareModal } from './GroupShareModal';
 import { GroupChatDrawer } from '../chat/GroupChatDrawer';
 import { GroupForumView } from '../forum/GroupForumView';
+import { GroupSessionsHistoryView } from './GroupSessionsHistoryView';
 import { CoachMessageModal } from './CoachMessageModal';
 import { AICoachingService } from '../../services/aiCoachingService';
 import { Athlete, AICoachingSuggestion } from '../../types';
@@ -32,7 +33,8 @@ import {
   Watch,
   Zap,
   Radio,
-  Pin
+  Pin,
+  RotateCcw
 } from 'lucide-react';
 import { formatDuration } from '../../lib/calculations';
 
@@ -53,7 +55,7 @@ export const CoachDashboard: React.FC = () => {
     sendCoachMessage
   } = useRadar();
 
-  const [activeTab, setActiveTab] = useState<'grid' | 'map' | 'forum'>('grid');
+  const [activeTab, setActiveTab] = useState<'grid' | 'map' | 'history' | 'forum'>('grid');
   const [filterStatus, setFilterStatus] = useState<'all' | 'alert' | 'attention' | 'normal' | 'offline'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isNewSessionOpen, setIsNewSessionOpen] = useState(false);
@@ -490,6 +492,15 @@ export const CoachDashboard: React.FC = () => {
               <MapIcon className="w-4 h-4" />
             </button>
             <button
+              onClick={() => setActiveTab('history')}
+              className={`p-1.5 rounded-lg transition flex items-center gap-1 ${
+                activeTab === 'history' ? 'bg-cyan-500 text-black shadow' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Historial de Sesiones Sincronizadas"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+            <button
               onClick={() => setActiveTab('forum')}
               className={`p-1.5 rounded-lg transition flex items-center gap-1 ${
                 activeTab === 'forum' ? 'bg-cyan-500 text-black shadow' : 'text-slate-400 hover:text-white'
@@ -504,7 +515,7 @@ export const CoachDashboard: React.FC = () => {
 
       </div>
 
-      {/* 4. CONTENIDO PRINCIPAL: GRILLA DE ATLETAS, MAPA O FORO */}
+      {/* 4. CONTENIDO PRINCIPAL: GRILLA DE ATLETAS, MAPA, HISTORIAL O FORO */}
       {activeTab === 'grid' && (
         <div>
           {filteredAthletes.length === 0 ? (
@@ -531,6 +542,17 @@ export const CoachDashboard: React.FC = () => {
         <LiveMapView
           athletes={filteredAthletes}
           onSelectAthlete={(id) => setSelectedAthleteId(id)}
+        />
+      )}
+
+      {activeTab === 'history' && currentGroup && (
+        <GroupSessionsHistoryView
+          currentGroup={currentGroup}
+          onOpenMessageModal={(ath, text) => {
+            setSelectedTargetAthlete(ath);
+            setInitialTacticalText(text || '');
+            setIsCoachMessageModalOpen(true);
+          }}
         />
       )}
 

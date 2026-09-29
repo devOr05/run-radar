@@ -1,4 +1,4 @@
-import { Athlete, Group, Coach, TrainingSession, AlertEvent, MetricSample } from '../types';
+import { Athlete, Group, Coach, TrainingSession, AlertEvent, MetricSample, CompletedSessionRecord } from '../types';
 
 export const initialCoach: Coach = {
   id: 'coach-juan',
@@ -203,3 +203,85 @@ export const initialAlerts: AlertEvent[] = [
     valueRecorded: '8%'
   }
 ];
+
+export const initialCompletedSessions: CompletedSessionRecord[] = [
+  {
+    id: 'session-rec-1',
+    groupId: 'group-martes',
+    groupName: 'Pelotón Fondistas A',
+    athleteId: 'athlete-1',
+    athleteName: 'Pedro Gómez',
+    sourceDevice: '⌚ Amazfit Balance',
+    date: 'Hoy, 07:30 hs',
+    startTime: Date.now() - 3600000 * 2,
+    endTime: Date.now() - 3600000 * 1.3,
+    durationSeconds: 2480, // ~41 mins
+    distanceMeters: 8200,  // 8.2 km
+    avgPaceSeconds: 302,   // 5:02/km
+    bestPaceSeconds: 275,  // 4:35/km
+    avgHeartRate: 158,
+    maxHeartRate: 176,
+    avgCadence: 176,
+    totalCalories: 620,
+    totalSteps: 7240,
+    syncTimestamp: Date.now() - 1800000,
+    syncType: 'offline_sync',
+    notes: 'Entrenamiento completado sin celular. Sincronizado desde el reloj al volver.',
+    splits: [
+      { km: 1, paceSeconds: 320, avgHr: 142 },
+      { km: 2, paceSeconds: 310, avgHr: 150 },
+      { km: 3, paceSeconds: 305, avgHr: 155 },
+      { km: 4, paceSeconds: 300, avgHr: 160 },
+      { km: 5, paceSeconds: 298, avgHr: 163 },
+      { km: 6, paceSeconds: 295, avgHr: 166 },
+      { km: 7, paceSeconds: 290, avgHr: 170 },
+      { km: 8, paceSeconds: 285, avgHr: 174 }
+    ]
+  },
+  {
+    id: 'session-rec-2',
+    groupId: 'group-martes',
+    groupName: 'Pelotón Fondistas A',
+    athleteId: 'athlete-2',
+    athleteName: 'Ana López',
+    sourceDevice: '⌚ Garmin Forerunner 265',
+    date: 'Hoy, 08:00 hs',
+    startTime: Date.now() - 3600000 * 3,
+    endTime: Date.now() - 3600000 * 2.35,
+    durationSeconds: 2325, // ~38m 45s
+    distanceMeters: 8000,  // 8.0 km
+    avgPaceSeconds: 290,   // 4:50/km
+    bestPaceSeconds: 270,  // 4:30/km
+    avgHeartRate: 164,
+    maxHeartRate: 181,
+    avgCadence: 182,
+    totalCalories: 590,
+    totalSteps: 7080,
+    syncTimestamp: Date.now() - 3600000,
+    syncType: 'offline_sync',
+    notes: 'Fondo parejo, sensaciones muy buenas en los últimos 2 km.'
+  },
+  {
+    id: 'session-rec-3',
+    groupId: 'group-jueves',
+    groupName: 'Grupo Progresivo Jueves',
+    athleteId: 'athlete-5',
+    athleteName: 'Lucas Sofía',
+    sourceDevice: '⌚ Xiaomi Smart Band 9',
+    date: 'Ayer, 19:15 hs',
+    startTime: Date.now() - 86400000,
+    endTime: Date.now() - 86400000 + 3250000,
+    durationSeconds: 3250, // 54 mins
+    distanceMeters: 10500, // 10.5 km
+    avgPaceSeconds: 309,   // 5:09/km
+    avgHeartRate: 152,
+    maxHeartRate: 169,
+    avgCadence: 174,
+    totalCalories: 780,
+    totalSteps: 9420,
+    syncTimestamp: Date.now() - 82000000,
+    syncType: 'offline_sync',
+    notes: 'Sincronizado vía Mi Fitness / RunRadar offline.'
+  }
+];
+

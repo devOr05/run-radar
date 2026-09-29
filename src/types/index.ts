@@ -230,3 +230,29 @@ export interface AICoachingSuggestion {
   timestamp: number;
 }
 
+export interface CompletedSessionRecord {
+  id: string;
+  groupId: string;
+  groupName: string;
+  athleteId: string;
+  athleteName: string;
+  athleteAvatar?: string;
+  sourceDevice: string;          // Ej: "Amazfit Balance", "Xiaomi Smart Band 9", "Garmin Forerunner", "GPS Celular"
+  date: string;                  // Ej: "2026-09-29" o texto legible
+  startTime: number;
+  endTime: number;
+  durationSeconds: number;       // Segundos totales
+  distanceMeters: number;        // Metros totales recorridos
+  avgPaceSeconds: number;        // Ritmo promedio en segundos/km
+  bestPaceSeconds?: number;      // Mejor km
+  avgHeartRate: number;          // FC promedio
+  maxHeartRate: number;          // FC máxima alcanzada
+  avgCadence: number;            // SPM promedio
+  totalCalories: number;         // kCal
+  totalSteps: number;            // Pasos totales
+  syncTimestamp: number;         // Momento exacto de subida/sincronización
+  syncType: 'offline_sync' | 'live_stream' | 'manual_upload';
+  notes?: string;                // Notas del corredor o DT
+  splits?: { km: number; paceSeconds: number; avgHr: number }[]; // Desglose por kilómetro
+}
+

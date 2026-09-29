@@ -30,10 +30,13 @@ import {
   MessageSquare,
   Pin,
   UserCheck,
-  HelpCircle
+  HelpCircle,
+  RotateCcw,
+  Clock
 } from 'lucide-react';
 import { formatPace, formatDistance, formatDuration, calculateHeartRateZone, getZoneDetails } from '../../lib/calculations';
 import { QRScannerModal } from './QRScannerModal';
+import { SyncOfflineModal } from './SyncOfflineModal';
 import { GroupChatDrawer } from '../chat/GroupChatDrawer';
 import { GroupForumView } from '../forum/GroupForumView';
 import { DeviceGuideContent } from '../common/DeviceGuideContent';
@@ -53,7 +56,8 @@ export const RunnerView: React.FC = () => {
     emitRunnerSample,
     setUserRole,
     coachMessages,
-    groupMessages
+    groupMessages,
+    completedSessions
   } = useRadar();
 
   // Pasos de Onboarding: 1. Intro, 2. Datos, 3. Entrenador, 4. Permisos, 5. Mi Entrenamiento (Listo)
@@ -123,8 +127,9 @@ export const RunnerView: React.FC = () => {
   const [isBluetoothConnecting, setIsBluetoothConnecting] = useState(false);
   const [isScanningHr, setIsScanningHr] = useState(false);
   const [bluetoothStatus, setBluetoothStatus] = useState<'idle' | 'connected' | 'reconnecting' | 'unsupported'>('idle');
-  const [activeScreenTab, setActiveScreenTab] = useState<'individual' | 'collective' | 'forum' | 'permissions' | 'guide'>('individual');
+  const [activeScreenTab, setActiveScreenTab] = useState<'individual' | 'collective' | 'sessions' | 'forum' | 'permissions' | 'guide'>('individual');
   const [showDeviceGuideModal, setShowDeviceGuideModal] = useState(false);
+  const [showSyncOfflineModal, setShowSyncOfflineModal] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Conectar adaptador local de Sensores del Celular (GPS + acelerómetro)
@@ -869,8 +874,8 @@ export const RunnerView: React.FC = () => {
               </div>
             )}
 
-            {/* Navigation Tabs (5 columnas) */}
-            <div className="grid grid-cols-5 bg-[#0B0F19] p-1 rounded-2xl border border-radar-border text-xs gap-1">
+            {/* Navigation Tabs (6 columnas responsivas) */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 bg-[#0B0F19] p-1 rounded-2xl border border-radar-border text-xs gap-1">
               <button
                 onClick={() => setActiveScreenTab('individual')}
                 className={`py-2 px-1 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
@@ -888,6 +893,15 @@ export const RunnerView: React.FC = () => {
               >
                 <Users className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">Pelotón</span>
+              </button>
+              <button
+                onClick={() => setActiveScreenTab('sessions')}
+                className={`py-2 px-1 rounded-xl font-bold transition flex items-center justify-center gap-1 ${
+                  activeScreenTab === 'sessions' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Mis Sesiones</span>
               </button>
               <button
                 onClick={() => setActiveScreenTab('forum')}
@@ -922,6 +936,29 @@ export const RunnerView: React.FC = () => {
           {/* ================= TAB 1: MI ESTADO INDIVIDUAL ================= */}
           {activeScreenTab === 'individual' && (
             <>
+              {/* Barra Rápida de Cronómetro y Sincronización */}
+              <div className="flex items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-slate-900 via-radar-card to-slate-900 rounded-2xl border border-radar-border shadow-md">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Cronómetro Activo</span>
+                    <span className="text-sm font-black text-white font-mono">
+                      {formatDuration(sessionSeconds)}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowSyncOfflineModal(true)}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-black font-extrabold text-xs transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20 shrink-0 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Finalizar y Sincronizar</span>
+                </button>
+              </div>
+
               {/* Telemetría Gigante del Corredor */}
               <div className="bg-radar-card border border-radar-border rounded-3xl p-6 sm:p-8 text-center relative overflow-hidden shadow-2xl">
                 
@@ -1404,6 +1441,157 @@ export const RunnerView: React.FC = () => {
             )
           )}
 
+          {/* ================= TAB: MIS SESIONES / HISTORIAL SINCRONIZADO ================= */}
+          {activeScreenTab === 'sessions' && (
+            <div className="space-y-4 animate-fadeIn">
+              
+              {/* Tarjeta de Acceso Rápido a Sincronización */}
+              <div className="bg-gradient-to-r from-cyan-950/40 via-slate-900 to-emerald-950/40 border border-cyan-500/30 p-5 rounded-3xl shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                      <RotateCcw className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-white">
+                        Sincronización con el Entrenador
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        {runnerGroup ? `Grupo: ${runnerGroup.name}` : 'Modo Libre (Sin grupo asignado)'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/50">
+                    🟢 Enlace Activo
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  ¿Corriste sin datos móviles o sólo con tu reloj (Amazfit, Xiaomi, Garmin)? Al terminar tu corrida, presiona el botón para enviar los datos directamente a la pantalla de tu profesor.
+                </p>
+
+                <button
+                  onClick={() => setShowSyncOfflineModal(true)}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-extrabold text-xs tracking-wider uppercase transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer"
+                >
+                  <Watch className="w-4 h-4 fill-black" />
+                  <span>Sincronizar Sesión Offline del Reloj / Celular</span>
+                </button>
+              </div>
+
+              {/* Lista de Sesiones del Corredor */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Mis Entrenamientos Sincronizados
+                  </h4>
+                  <span className="text-[11px] text-cyan-400 font-bold font-mono">
+                    {completedSessions.filter(s => s.athleteId === currentRunner?.id || s.groupId === runnerGroup?.id).length} registrados
+                  </span>
+                </div>
+
+                {completedSessions.filter(s => s.athleteId === currentRunner?.id || s.groupId === runnerGroup?.id).length === 0 ? (
+                  <div className="text-center py-12 bg-radar-card rounded-3xl border border-radar-border p-6 shadow-xl space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-800 text-slate-500 flex items-center justify-center mx-auto">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-sm font-bold text-white">Aún no tienes sesiones registradas</h4>
+                    <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                      Al finalizar tus entrenamientos en vivo o al sincronizar tu reloj deportivo, todas tus actividades quedarán listadas aquí.
+                    </p>
+                    <button
+                      onClick={() => setShowSyncOfflineModal(true)}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-xs font-bold transition"
+                    >
+                      Sincronizar mi primer entrenamiento →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {completedSessions
+                      .filter(s => s.athleteId === currentRunner?.id || s.groupId === runnerGroup?.id)
+                      .map((session) => (
+                        <div
+                          key={session.id}
+                          className="bg-radar-card border border-radar-border rounded-2xl p-4 sm:p-5 shadow-lg space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-extrabold text-white">
+                                  {session.date}
+                                </span>
+                                <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded-full border border-cyan-800/50">
+                                  {session.sourceDevice}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                Asignado a: <strong className="text-slate-200">{session.groupName}</strong>
+                              </p>
+                            </div>
+
+                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-800/50 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Recibido por el DT
+                            </span>
+                          </div>
+
+                          {/* Grid de Métricas */}
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 bg-[#0B0F19] p-3 rounded-xl border border-radar-border text-center">
+                            <div>
+                              <span className="text-[9px] text-slate-400 uppercase block">Distancia</span>
+                              <span className="text-sm font-black text-emerald-400 font-mono">
+                                {formatDistance(session.distanceMeters)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 uppercase block">Tiempo</span>
+                              <span className="text-sm font-black text-white font-mono">
+                                {formatDuration(session.durationSeconds)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 uppercase block">Ritmo</span>
+                              <span className="text-sm font-black text-cyan-400 font-mono">
+                                {formatPace(session.avgPaceSeconds)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 uppercase block">FC Media</span>
+                              <span className="text-sm font-black text-rose-400 font-mono">
+                                {session.avgHeartRate} BPM
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 uppercase block">Cadencia</span>
+                              <span className="text-sm font-black text-sky-400 font-mono">
+                                {session.avgCadence} SPM
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] text-slate-400 uppercase block">Calorías</span>
+                              <span className="text-sm font-black text-amber-400 font-mono">
+                                {session.totalCalories} kcal
+                              </span>
+                            </div>
+                          </div>
+
+                          {session.notes && (
+                            <p className="text-xs text-slate-400 italic bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                              "{session.notes}"
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+              </div>
+
+            </div>
+          )}
+
           {/* ================= TAB 3: FORO / MURO COMUNITARIO ================= */}
           {activeScreenTab === 'forum' && (
             <div className="space-y-4 animate-fadeIn">
@@ -1622,6 +1810,20 @@ export const RunnerView: React.FC = () => {
       <DeviceGuideModal
         isOpen={showDeviceGuideModal}
         onClose={() => setShowDeviceGuideModal(false)}
+      />
+
+      {/* Modal de Sincronización Offline y Fin de Sesión */}
+      <SyncOfflineModal
+        isOpen={showSyncOfflineModal}
+        onClose={() => setShowSyncOfflineModal(false)}
+        currentSessionSeconds={sessionSeconds}
+        currentDistanceMeters={sample?.distance || 0}
+        currentPaceSeconds={sample?.pace || 0}
+        currentHr={hr}
+        currentCadence={sample?.cadence || 0}
+        currentCalories={sample?.calories || 0}
+        currentSteps={sample?.steps || 0}
+        onSuccess={() => setActiveScreenTab('sessions')}
       />
 
     </div>

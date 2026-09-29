@@ -13,7 +13,8 @@ import {
   CoachMessage,
   GroupChatMessage,
   GroupForumPost,
-  SUPER_ADMIN_EMAIL
+  SUPER_ADMIN_EMAIL,
+  CompletedSessionRecord
 } from '../types';
 import { supabaseService, isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 import { 
@@ -21,7 +22,8 @@ import {
   initialGroups, 
   initialAthletes, 
   initialActiveSession, 
-  initialAlerts 
+  initialAlerts,
+  initialCompletedSessions
 } from '../data/initialData';
 import { notifyNewRunner, notifyNewGroupCreated } from '../services/telegramNotificationService';
 
@@ -40,6 +42,7 @@ interface RadarContextType {
   coachMessages: CoachMessage[];
   groupMessages: GroupChatMessage[];
   forumPosts: GroupForumPost[];
+  completedSessions: CompletedSessionRecord[];
   
   // Actions
   setSelectedGroupId: (id: string | null) => void;
@@ -67,6 +70,8 @@ interface RadarContextType {
   sendGroupChatMessage: (data: Omit<GroupChatMessage, 'id' | 'timestamp'>) => Promise<void>;
   createForumPost: (data: Omit<GroupForumPost, 'id' | 'timestamp'>) => Promise<void>;
   likeForumPost: (postId: string) => Promise<void>;
+  saveCompletedSession: (data: Omit<CompletedSessionRecord, 'id' | 'syncTimestamp'>) => Promise<CompletedSessionRecord>;
+  deleteCompletedSession: (sessionId: string) => Promise<void>;
 }
 
 const RadarContext = createContext<RadarContextType | undefined>(undefined);
@@ -153,6 +158,19 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {
       return [];
     }
+  });
+
+  const [completedSessions, setCompletedSessions] = useState<CompletedSessionRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('runradar_completed_sessions');
+      if (saved) {
+        const parsed = JSON.parse(saved) as CompletedSessionRecord[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return initialCompletedSessions;
   });
 
   // 1. Detección de invitaciones por WhatsApp/QR (?join=...) y Auto-Login persistente del celular
@@ -945,6 +963,35 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
+  const saveCompletedSession = async (data: Omit<CompletedSessionRecord, 'id' | 'syncTimestamp'>): Promise<CompletedSessionRecord> => {
+    const newRecord: CompletedSessionRecord = {
+      ...data,
+      id: `session-rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      syncTimestamp: Date.now()
+    };
+    setCompletedSessions(prev => {
+      const updated = [newRecord, ...prev];
+      try {
+        localStorage.setItem('runradar_completed_sessions', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    if (socket && socket.connected) {
+      socket.emit('session_synced', newRecord);
+    }
+    return newRecord;
+  };
+
+  const deleteCompletedSession = async (sessionId: string) => {
+    setCompletedSessions(prev => {
+      const updated = prev.filter(s => s.id !== sessionId);
+      try {
+        localStorage.setItem('runradar_completed_sessions', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
   return (
     <RadarContext.Provider
       value={{
@@ -962,6 +1009,7 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         coachMessages,
         groupMessages,
         forumPosts,
+        completedSessions,
         setSelectedGroupId,
         setSelectedAthleteId,
         setUserRole: handleSetUserRole,
@@ -987,6 +1035,8 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         sendGroupChatMessage,
         createForumPost,
         likeForumPost,
+        saveCompletedSession,
+        deleteCompletedSession,
       }}
     >
       {children}
