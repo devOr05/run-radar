@@ -34,7 +34,8 @@ import {
   Zap,
   Radio,
   Pin,
-  RotateCcw
+  RotateCcw,
+  X
 } from 'lucide-react';
 import { formatDuration } from '../../lib/calculations';
 
@@ -52,7 +53,9 @@ export const CoachDashboard: React.FC = () => {
     stopSession,
     exportCSV,
     groupMessages,
-    sendCoachMessage
+    sendCoachMessage,
+    latestSyncedSession,
+    clearLatestSyncedSession
   } = useRadar();
 
   const [activeTab, setActiveTab] = useState<'grid' | 'map' | 'history' | 'forum'>('grid');
@@ -106,6 +109,52 @@ export const CoachDashboard: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 space-y-6">
       
+      {/* Banner Toast en Vivo: Alerta inmediata cuando un Corredor sincroniza su sesión */}
+      {latestSyncedSession && (
+        <div className="bg-gradient-to-r from-emerald-950/90 via-slate-900 to-cyan-950/90 border border-emerald-500/50 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-2xl shadow-emerald-500/10 animate-fadeIn">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+              <RotateCcw className="w-5 h-5 animate-spin-slow" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-extrabold uppercase border border-emerald-500/30">
+                  ⚡ NUEVA SESIÓN RECIBIDA EN VIVO
+                </span>
+                <span className="text-xs text-slate-400 font-medium">
+                  {latestSyncedSession.groupName}
+                </span>
+              </div>
+              <p className="text-sm font-extrabold text-white mt-0.5">
+                🏃 {latestSyncedSession.athleteName} sincronizó {(latestSyncedSession.distanceMeters / 1000).toFixed(2)} km
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Dispositivo: {latestSyncedSession.sourceDevice} • FC Prom: {latestSyncedSession.avgHeartRate} BPM • Ritmo: {Math.floor(latestSyncedSession.avgPaceSeconds / 60)}:{(latestSyncedSession.avgPaceSeconds % 60).toString().padStart(2, '0')}/km
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setActiveTab('history');
+                clearLatestSyncedSession();
+              }}
+              className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black transition shadow-lg shadow-emerald-500/20 flex items-center gap-1.5"
+            >
+              <span>Ver en Historial</span>
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={clearLatestSyncedSession}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+              title="Cerrar notificación"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Barra de Navegación del Grupo: Volver al Hub de Grupos + Acciones Rápidas */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl shadow-sm">
         <div className="flex items-center gap-3">
@@ -492,13 +541,22 @@ export const CoachDashboard: React.FC = () => {
               <MapIcon className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setActiveTab('history')}
-              className={`p-1.5 rounded-lg transition flex items-center gap-1 ${
+              onClick={() => {
+                setActiveTab('history');
+                clearLatestSyncedSession();
+              }}
+              className={`p-1.5 rounded-lg transition relative flex items-center gap-1 ${
                 activeTab === 'history' ? 'bg-cyan-500 text-black shadow' : 'text-slate-400 hover:text-white'
               }`}
               title="Historial de Sesiones Sincronizadas"
             >
               <RotateCcw className="w-4 h-4" />
+              {latestSyncedSession && activeTab !== 'history' && (
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab('forum')}

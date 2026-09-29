@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { MetricSample, TrainingSession, Athlete } from '../types';
+import { MetricSample, TrainingSession, Athlete, CompletedSessionRecord } from '../types';
 
 const metaEnv = (import.meta as any).env || {};
 const supabaseUrl = metaEnv.VITE_SUPABASE_URL || 'https://oxfqrynciausdebcfqfk.supabase.co';
@@ -44,6 +44,95 @@ export const supabaseService = {
       .subscribe();
 
     return channel;
+  },
+
+  /**
+   * Suscribirse a sesiones completadas sincronizadas por los atletas vía Realtime Broadcast
+   */
+  subscribeToCompletedSessions(
+    groupId: string | null,
+    onSession: (session: CompletedSessionRecord) => void
+  ) {
+    if (!supabase) return null;
+
+    const channelName = groupId ? `group-sessions:${groupId}` : 'runradar-completed-sessions';
+    const channel = supabase.channel(channelName, {
+      config: { broadcast: { self: false } },
+    });
+
+    channel
+      .on('broadcast', { event: 'completed-session' }, (payload) => {
+        if (payload?.payload) {
+          onSession(payload.payload as CompletedSessionRecord);
+        }
+      })
+      .subscribe();
+
+    return channel;
+  },
+
+  /**
+   * Emitir una sesión completada sincronizada por un corredor hacia el entrenador
+   */
+  async broadcastCompletedSession(groupId: string, session: CompletedSessionRecord) {
+    if (!supabase) return;
+
+    // 1. Enviar por canal específico del grupo
+    try {
+      const groupChannel = supabase.channel(`group-sessions:${groupId}`);
+      await groupChannel.send({
+        type: 'broadcast',
+        event: 'completed-session',
+        payload: session,
+      });
+    } catch (e) {
+      console.warn('Error broadcasting session to group channel', e);
+    }
+
+    // 2. Enviar por canal global para que cualquier entrenador lo reciba de inmediato
+    try {
+      const globalChannel = supabase.channel('runradar-completed-sessions');
+      await globalChannel.send({
+        type: 'broadcast',
+        event: 'completed-session',
+        payload: session,
+      });
+    } catch (e) {
+      console.warn('Error broadcasting session to global channel', e);
+    }
+
+    // 3. Persistir en la base de datos Supabase de forma no bloqueante
+    try {
+      supabase
+        .from('completed_sessions')
+        .insert({
+          id: session.id,
+          group_id: session.groupId,
+          group_name: session.groupName,
+          athlete_id: session.athleteId,
+          athlete_name: session.athleteName,
+          athlete_avatar: session.athleteAvatar || null,
+          source_device: session.sourceDevice,
+          date: session.date,
+          start_time: session.startTime,
+          end_time: session.endTime,
+          duration_seconds: session.durationSeconds,
+          distance_meters: session.distanceMeters,
+          avg_pace_seconds: session.avgPaceSeconds,
+          best_pace_seconds: session.bestPaceSeconds || null,
+          avg_heart_rate: session.avgHeartRate,
+          max_heart_rate: session.maxHeartRate,
+          avg_cadence: session.avgCadence,
+          total_calories: session.totalCalories,
+          total_steps: session.totalSteps,
+          sync_timestamp: session.syncTimestamp,
+          sync_type: session.syncType,
+          notes: session.notes || null,
+        })
+        .then(() => {}, (err: any) => {
+          console.info('Supabase Postgres sync info:', err?.message);
+        });
+    } catch (e) {}
   },
 
   /**

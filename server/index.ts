@@ -54,6 +54,13 @@ io.on('connection', (socket) => {
     socket.join(`group:${groupId}`);
   });
 
+  // Evento cuando un corredor sincroniza una sesión completada (offline o live)
+  socket.on('session_synced', (record: any) => {
+    console.log(`[Socket.io] Sesión sincronizada recibida: ${record.athleteName} (${record.distanceMeters}m)`);
+    // Re-emitir a todos los clientes (entrenadores y corredores)
+    io.emit('session_synced', record);
+  });
+
   socket.on('disconnect', () => {
     console.log(`[Socket.io] Cliente desconectado: ${socket.id}`);
   });

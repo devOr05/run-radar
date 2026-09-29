@@ -288,6 +288,11 @@ export const GroupSessionsHistoryView: React.FC<GroupSessionsHistoryViewProps> =
                           <CheckCircle2 className="w-3 h-3" />
                           {session.syncType === 'offline_sync' ? 'Sincronizado Offline' : 'Grabado en Vivo'}
                         </span>
+                        {Date.now() - session.syncTimestamp < 900000 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-500/50 animate-pulse">
+                            ⚡ Recién Sincronizada
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

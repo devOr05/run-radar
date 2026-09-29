@@ -43,8 +43,10 @@ interface RadarContextType {
   groupMessages: GroupChatMessage[];
   forumPosts: GroupForumPost[];
   completedSessions: CompletedSessionRecord[];
+  latestSyncedSession: CompletedSessionRecord | null;
   
   // Actions
+  clearLatestSyncedSession: () => void;
   setSelectedGroupId: (id: string | null) => void;
   setSelectedAthleteId: (id: string | null) => void;
   setUserRole: (role: UserRole | null) => void;
@@ -172,6 +174,22 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {}
     return initialCompletedSessions;
   });
+
+  const [latestSyncedSession, setLatestSyncedSession] = useState<CompletedSessionRecord | null>(null);
+  const clearLatestSyncedSession = useCallback(() => setLatestSyncedSession(null), []);
+
+  const handleIncomingCompletedSession = useCallback((newRecord: CompletedSessionRecord) => {
+    if (!newRecord || !newRecord.id) return;
+    setCompletedSessions(prev => {
+      if (prev.some(s => s.id === newRecord.id)) return prev;
+      const updated = [newRecord, ...prev];
+      try {
+        localStorage.setItem('runradar_completed_sessions', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    setLatestSyncedSession(newRecord);
+  }, []);
 
   // 1. Detección de invitaciones por WhatsApp/QR (?join=...) y Auto-Login persistente del celular
   useEffect(() => {
@@ -304,6 +322,10 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setAlerts(newAlerts);
     });
 
+    s.on('session_synced', (newRecord: CompletedSessionRecord) => {
+      handleIncomingCompletedSession(newRecord);
+    });
+
     setSocket(s);
 
     // Fallback inicial por API REST en caso de carga previa
@@ -316,7 +338,81 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       s.disconnect();
     };
+  }, [handleIncomingCompletedSession]);
+
+  // Suscribirse a sesiones completadas sincronizadas por los atletas vía Supabase Realtime (Cross-device por Internet)
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    const channel = supabaseService.subscribeToCompletedSessions(null, (session) => {
+      handleIncomingCompletedSession(session);
+    });
+
+    return () => {
+      if (channel) channel.unsubscribe();
+    };
+  }, [handleIncomingCompletedSession]);
+
+  // Sincronización multi-pestaña y local mediante BroadcastChannel
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+
+    const bc = new BroadcastChannel('runradar_sessions_sync');
+    bc.onmessage = (event) => {
+      if (event.data?.type === 'completed_session' && event.data.record) {
+        handleIncomingCompletedSession(event.data.record);
+      }
+    };
+
+    return () => {
+      bc.close();
+    };
+  }, [handleIncomingCompletedSession]);
+
+  // Sincronización de eventos de almacenamiento (localStorage storage event)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'runradar_completed_sessions' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            setCompletedSessions(parsed);
+          }
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
+
+  // Cola automática de subida para sesiones guardadas mientras el corredor estaba sin conexión
+  useEffect(() => {
+    const processPendingQueue = () => {
+      try {
+        const queueStr = localStorage.getItem('runradar_pending_offline_sync');
+        if (queueStr) {
+          const queue = JSON.parse(queueStr) as CompletedSessionRecord[];
+          if (Array.isArray(queue) && queue.length > 0) {
+            queue.forEach(rec => {
+              if (isSupabaseConfigured) {
+                supabaseService.broadcastCompletedSession(rec.groupId, rec);
+              }
+              if (socket && socket.connected) {
+                socket.emit('session_synced', rec);
+              }
+            });
+            localStorage.removeItem('runradar_pending_offline_sync');
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('online', processPendingQueue);
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      processPendingQueue();
+    }
+    return () => window.removeEventListener('online', processPendingQueue);
+  }, [socket]);
 
   // Suscribirse a Supabase Realtime si está configurado en la nube
   useEffect(() => {
@@ -969,6 +1065,8 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       id: `session-rec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       syncTimestamp: Date.now()
     };
+
+    // 1. Guardar localmente
     setCompletedSessions(prev => {
       const updated = [newRecord, ...prev];
       try {
@@ -976,9 +1074,36 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch (e) {}
       return updated;
     });
+
+    // 2. Broadcast local por BroadcastChannel (mismo navegador / PWA)
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('runradar_sessions_sync');
+        bc.postMessage({ type: 'completed_session', record: newRecord });
+        bc.close();
+      }
+    } catch (e) {}
+
+    // 3. Emitir por Socket.io si está conectado
     if (socket && socket.connected) {
       socket.emit('session_synced', newRecord);
     }
+
+    // 4. Emitir por Supabase Realtime a través de Internet (Cross-Device móvil ↔ PC DT)
+    if (isSupabaseConfigured) {
+      supabaseService.broadcastCompletedSession(newRecord.groupId, newRecord);
+    }
+
+    // 5. Si no hay conexión en este instante, poner en cola pendiente para reintento automático
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      try {
+        const pendingStr = localStorage.getItem('runradar_pending_offline_sync');
+        const queue = pendingStr ? JSON.parse(pendingStr) : [];
+        queue.push(newRecord);
+        localStorage.setItem('runradar_pending_offline_sync', JSON.stringify(queue));
+      } catch (e) {}
+    }
+
     return newRecord;
   };
 
@@ -1010,6 +1135,8 @@ export const RadarProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         groupMessages,
         forumPosts,
         completedSessions,
+        latestSyncedSession,
+        clearLatestSyncedSession,
         setSelectedGroupId,
         setSelectedAthleteId,
         setUserRole: handleSetUserRole,
