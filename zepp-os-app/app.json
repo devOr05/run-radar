@@ -2,15 +2,15 @@
   "configVersion": "v3",
   "app": {
     "appId": 1128132,
-    "appName": "RunRadar",
+    "appName": "RunRadar Telemetry",
     "appType": "app",
     "version": {
-      "code": 2,
+      "code": 3,
       "name": "1.0.1"
     },
     "icon": "icon.png",
     "vender": "RunRadar",
-    "description": "Telemetría deportiva y pulso en tiempo real para corredores y grupos de running."
+    "description": "Real-time running telemetry, heart rate zones, and coach tactical alerts. Feedback & Support: orostizagamario@gmail.com"
   },
   "permissions": [
     "device:os.bg_service",
@@ -60,10 +60,10 @@
   },
   "i18n": {
     "es-ES": {
-      "appName": "RunRadar"
+      "appName": "RunRadar Telemetry"
     },
     "en-US": {
-      "appName": "RunRadar"
+      "appName": "RunRadar Telemetry"
     }
   },
   "defaultLanguage": "es-ES"
